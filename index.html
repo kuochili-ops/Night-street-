@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Below Lamp Alignment</title>
+    <title>NightST - Absolute Static Position</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precision Alignment</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Absolute Static</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,31 +27,21 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行日光燈下對位</button>
+        <button class="btn" id="runBtn">啟動絕對靜態合成</button>
     </div>
 </div>
 
 <script>
-const MotionController = {
-    /**
-     * 修正細節：
-     * 1. endY = 0.18：將終點從 0.12 下調，確保第一行字避開上方日光燈。
-     * 2. startY = -0.10：起始點稍微下移，減少由高空落下的距離，增加「黏合」感。
-     * 3. 時間 = 3.6s：保持慢速下降。
-     */
-    getY: (h, time) => {
-        const startY = h * -0.10; 
-        const endY = h * 0.18; 
-        
-        if (time < 1.1) return startY;
-        if (time > 4.7) return endY;
-
-        const progress = (time - 1.1) / 3.6; 
-        // 使用二階 Ease-Out，讓文字在接近日光燈下方時緩緩停住
-        const eased = 1 - Math.pow(1 - progress, 2); 
-        return startY + (endY - startY) * eased;
-    }
-};
+/**
+ * 根據您的指令：字都不動。
+ * 第一行與第二行都固定在日光燈下方的黃金位置。
+ */
+const FlipBoardModule = (() => {
+    return {
+        // 固定位置設定 (日光燈下方約 0.18)
+        getFixedY: (h) => h * 0.18
+    };
+})();
 
 const video = document.getElementById('mainVideo');
 const canvas = document.getElementById('compCanvas');
@@ -67,13 +57,16 @@ function render() {
     const signText = document.getElementById('signText').value;
     const textColor = document.getElementById('textColor').value;
 
-    if (signText && video.currentTime > 1.1) {
+    // 只有在招牌已經出現的時間點才繪製文字
+    if (signText && video.currentTime > 1.0) {
         ctx.save();
-        const yOffset = MotionController.getY(h, video.currentTime);
         
-        // 點滅點亮邏輯
+        // 核心修正：yOffset 變為常數，不再隨時間變化
+        const yOffset = FlipBoardModule.getFixedY(h);
+        
+        // 點滅點亮邏輯 (配合影片節奏)
         let intensity = 1;
-        if (video.currentTime > 3.0 && video.currentTime < 4.6) {
+        if (video.currentTime > 3.0 && video.currentTime < 4.5) {
             intensity = Math.random() > 0.4 ? 1 : 0.1;
         }
 
@@ -83,7 +76,7 @@ function render() {
         ctx.textBaseline = "middle";
         
         const lines = signText.length > 6 ? [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : [signText];
-        const fontSize = signText.length > 6 ? h * 0.11 : h * 0.15; // 稍微縮小字體以增加留白空間
+        const fontSize = signText.length > 6 ? h * 0.11 : h * 0.15;
         ctx.font = `900 ${fontSize}px sans-serif`;
         
         ctx.shadowColor = textColor;
@@ -91,7 +84,9 @@ function render() {
 
         const lineHeight = fontSize * 1.35;
 
+        // 繪製文字 (兩行位置皆固定)
         lines.forEach((line, index) => {
+            // 文字位置死鎖，會被由下往上的招牌自然「刷出」
             ctx.fillText(line, w / 2, yOffset + (index * lineHeight));
         });
 
