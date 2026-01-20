@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 高度精細校準</title>
+    <title>NightST - 高度最終精修</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,20 +23,20 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動高度校準測試</button>
+    <button id="runBtn">啟動高度精修測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 高度精細校準
+ * FlipBoardModule - 高度精細化同步
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：微調至 -0.05
-            const startY = h * -0.05; 
-            // 📍 終點：提升至 0.25，讓文字更靠近燈管
-            const endY = h * 0.25; 
+            // 🚩 起點：調高至 -0.15，讓文字更早與綠板上緣接觸
+            const startY = h * -0.15; 
+            // 📍 終點：上移至 0.18，鎖定在高位
+            const endY = h * 0.18; 
             
             if (time < 1.4) return startY;
             if (time > 5.0) return endY; 
