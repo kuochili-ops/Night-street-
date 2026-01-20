@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Precise Masking V4</title>
+    <title>NightST - Cinema Motion Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Masking</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Motion Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,30 +27,36 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" placeholder="請輸入文字..." style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行精準合成</button>
+        <button class="btn" id="runBtn">啟動同步合成</button>
     </div>
 </div>
 
 <script>
 /**
- * FlipBoard 模組
+ * FlipBoard 模組：同步運鏡位移
  */
 const FlipBoardModule = (() => {
     return {
-        // 生成固定座標的文字貼圖
-        getStaticTextTexture: (text, w, h, color, time) => {
+        getSyncedTexture: (text, w, h, color, time) => {
             const cvs = document.createElement('canvas');
             cvs.width = w; cvs.height = h;
             const x = cvs.getContext('2d');
             
-            x.fillStyle = "rgba(5, 8, 5, 0.95)";
+            x.fillStyle = "rgba(10, 12, 10, 0.98)";
             x.fillRect(0, 0, w, h);
 
-            let intensity = 0;
+            // 1. 計算位移：模擬看板由上往下移入畫面的動態
+            // 在 0.5s 到 2.5s 之間，文字從 y=-20% 處移動到 y=45% 處
+            let yOffset = h * 0.45; 
+            if (time < 2.5) {
+                const progress = Math.max(0, (time - 0.5) / 2.0);
+                yOffset = (h * -0.2) + (h * 0.65 * progress); 
+            }
+
+            // 2. 啟動閃爍特效 (2.5s 開始)
+            let intensity = 1;
             if (time >= 2.5 && time < 3.5) {
-                intensity = Math.random() > 0.4 ? 1 : 0.1;
-            } else if (time >= 3.5) {
-                intensity = 1;
+                intensity = Math.random() > 0.4 ? 1 : 0.15;
             }
 
             if (text) {
@@ -59,26 +65,26 @@ const FlipBoardModule = (() => {
                 x.textAlign = "center";
                 x.textBaseline = "middle";
                 
-                // 自動判斷分行：字數 > 6 則分兩行
                 let lines = text.length > 6 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
-                let fontSize = text.length > 6 ? h * 0.12 : h * 0.16;
-                
+                let fontSize = text.length > 6 ? h * 0.11 : h * 0.17;
                 x.font = `900 ${fontSize}px sans-serif`;
                 x.shadowColor = color;
-                x.shadowBlur = 25 * intensity;
+                x.shadowBlur = 25;
 
-                // 關鍵：將文字固定在 y = h * 0.4 處，模擬在高處看板的位置
                 const lineHeight = fontSize * 1.3;
-                const fixedY = (h * 0.4) - ((lines.length - 1) * lineHeight / 2);
+                const startY = yOffset - ((lines.length - 1) * lineHeight / 2);
 
                 lines.forEach((line, index) => {
-                    x.fillText(line, w / 2, fixedY + (index * lineHeight));
+                    x.fillText(line, w / 2, startY + (index * lineHeight));
                 });
             }
             return cvs;
         },
-        // 優化偵測邏輯，確保只抓取橫向大看板的綠色
-        isLargeBillboardGreen: (r, g, b) => (g > 45 && g > r * 1.3 && g > b * 1.1)
+        // 嚴格過濾：只針對上方看板區域
+        isTargetGreen: (r, g, b, y, canvasH) => {
+            // 限制掃描高度在畫面上半部，且必須符合綠色特徵
+            return (y < canvasH * 0.6) && (g > 50 && g > r * 1.3 && g > b * 1.1);
+        }
     };
 })();
 
@@ -88,7 +94,7 @@ const ctx = canvas.getContext('2d', { alpha: false });
 const cornerImg = new Image();
 cornerImg.src = 'IMG_6604.png';
 
-function processFrame() {
+function render() {
     if (video.paused || video.ended) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -97,19 +103,19 @@ function processFrame() {
     if (signInput) {
         const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = frame.data;
-        const textTex = FlipBoardModule.getStaticTextTexture(
+        
+        const textLayer = FlipBoardModule.getSyncedTexture(
             signInput, canvas.width, canvas.height, 
             document.getElementById('textColor').value, video.currentTime
         );
-        const texPixels = textTex.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 僅在影片 2.0s 後且只掃描畫面上半部 (y < 60%)
-        // 這樣可確保下方的直式招牌綠色不會被修改
-        if (video.currentTime > 2.0) {
-            for (let y = 0; y < canvas.height * 0.6; y++) { 
+        // 僅在 1.0s 後開始處理（完全避開一開始的直式招牌）
+        if (video.currentTime > 1.0) {
+            for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
                     const i = (y * canvas.width + x) * 4;
-                    if (FlipBoardModule.isLargeBillboardGreen(data[i], data[i+1], data[i+2])) {
+                    if (FlipBoardModule.isTargetGreen(data[i], data[i+1], data[i+2], y, canvas.height)) {
                         data[i] = texPixels[i];
                         data[i+1] = texPixels[i+1];
                         data[i+2] = texPixels[i+2];
@@ -120,14 +126,13 @@ function processFrame() {
         }
     }
 
-    // 右下角圖片
     if (video.currentTime >= 3.0) {
         const imgW = canvas.width * 0.22;
         const imgH = (cornerImg.height / cornerImg.width) * imgW;
         ctx.drawImage(cornerImg, canvas.width - imgW - 20, canvas.height - imgH - 20, imgW, imgH);
     }
     
-    requestAnimationFrame(processFrame);
+    requestAnimationFrame(render);
 }
 
 document.getElementById('runBtn').addEventListener('click', () => {
@@ -135,7 +140,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
     canvas.height = video.videoHeight || 720;
     video.currentTime = 0;
     video.play();
-    processFrame();
+    render();
 });
 </script>
 </body>
