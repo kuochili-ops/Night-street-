@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 物理動態鎖定</title>
+    <title>NightST - 位置下壓測試</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,27 +23,18 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動動態鎖定測試</button>
+    <button id="runBtn">啟動下壓校準測試</button>
 </div>
 
 <script>
-/**
- * FlipBoardModule - 動態位移補償
- */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：顯著提高到 -0.50
-            const startY = h * -0.50; 
-            // 📍 終點：調低至 0.28，拉開與燈管的距離
-            const endY = h * 0.28; 
-            
-            // ⏱️ 1.8s ~ 5.0s 完成主要下降
-            if (time < 1.8) return startY;
+            const startY = h * 0.05; 
+            const endY = h * 0.35; 
+            if (time < 1.5) return startY;
             if (time > 5.0) return endY; 
-
-            // 使用平滑線性位移
-            const progress = (time - 1.8) / 3.2; 
+            const progress = (time - 1.5) / 3.5; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -55,21 +46,17 @@ const ctx = canvas.getContext('2d');
 
 function render() {
     if (video.paused || video.ended) return;
-
     const w = canvas.width;
     const h = canvas.height;
     ctx.drawImage(video, 0, 0, w, h);
-
     const signText = document.getElementById('signText').value;
 
-    if (signText && video.currentTime > 1.8) {
+    if (signText && video.currentTime > 1.5) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
-        
         ctx.fillStyle = "#00ff88"; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
-        
         const fontSize = h * 0.12; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = "#00ff88";
@@ -80,11 +67,9 @@ function render() {
             [signText];
             
         const lineHeight = fontSize * 1.1; 
-
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
-
         ctx.restore();
     }
     requestAnimationFrame(render);
