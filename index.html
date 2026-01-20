@@ -2,23 +2,23 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Final Master Sync</title>
+    <title>NightST - Absolute Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
-        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; }
         .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px; }
         canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         #mainVideo { display: none; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; font-size: 16px; }
-        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; font-size: 18px; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; }
+        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Ultimate Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Absolute Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,23 +27,22 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">啟動完美同步合成</button>
+        <button class="btn" id="runBtn">執行極致同步</button>
     </div>
 </div>
 
 <script>
-/**
- * 核心物理連動邏輯
- */
 const MotionController = {
-    // 根據影片時間計算 Y 軸偏移 (1.1s -> 4.0s)
-    // 起始位置設為 -20%，確保第二行下半部最先被露出
+    // 關鍵調整：
+    // 1. 移動區間大幅拉長至 3.5 秒 (1.1s -> 4.6s)，達成「更慢」的需求。
+    // 2. 起始高度微調為 -10%，精準對位第二行底部。
     getY: (h, time) => {
-        if (time < 1.1) return h * -0.20;
-        if (time > 4.0) return h * 0.44;
-        const progress = (time - 1.1) / 2.9; // 2.9秒的長位移，匹配鏡頭速度
-        const eased = 1 - Math.pow(1 - progress, 2); // 使用更平滑的線性減速
-        return (h * -0.20) + (h * 0.64 * eased);
+        if (time < 1.1) return h * -0.10;
+        if (time > 4.6) return h * 0.44;
+        const progress = (time - 1.1) / 3.5; 
+        // 使用更高階的漸慢曲線 (Quartic)，讓文字與鏡頭減速完全同步
+        const eased = 1 - Math.pow(1 - progress, 4); 
+        return (h * -0.10) + (h * 0.54 * eased);
     }
 };
 
@@ -57,7 +56,6 @@ function render() {
     const w = canvas.width;
     const h = canvas.height;
 
-    // 1. 繪製原始影片底圖
     ctx.drawImage(video, 0, 0, w, h);
 
     const signText = document.getElementById('signText').value;
@@ -65,17 +63,13 @@ function render() {
 
     if (signText && video.currentTime > 1.1) {
         ctx.save();
-        
-        // 2. 計算目前應有的位置
         const yOffset = MotionController.getY(h, video.currentTime);
         
-        // 3. 設定閃爍點滅強度
         let intensity = 1;
-        if (video.currentTime > 2.8 && video.currentTime < 3.8) {
-            intensity = Math.random() > 0.5 ? 1 : 0.2;
+        if (video.currentTime > 2.8 && video.currentTime < 4.2) {
+            intensity = Math.random() > 0.4 ? 1 : 0.1;
         }
 
-        // 4. 文字繪製設置 (高品質路徑，解決糊掉問題)
         ctx.globalAlpha = intensity;
         ctx.fillStyle = textColor;
         ctx.textAlign = "center";
@@ -83,16 +77,14 @@ function render() {
         
         const lines = signText.length > 6 ? [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : [signText];
         const fontSize = signText.length > 6 ? h * 0.11 : h * 0.16;
-        ctx.font = `900 ${fontSize}px "Microsoft JhengHei", sans-serif`;
+        ctx.font = `900 ${fontSize}px sans-serif`;
         
-        // 霓虹發光感
         ctx.shadowColor = textColor;
         ctx.shadowBlur = 25 * intensity;
 
         const lineHeight = fontSize * 1.35;
         const startY = yOffset - ((lines.length - 1) * lineHeight / 2);
 
-        // 5. 繪製文字 (直接疊加，無黑底)
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, startY + (index * lineHeight));
         });
