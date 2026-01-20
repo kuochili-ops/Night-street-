@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 最終物理同步校準</title>
+    <title>NightST - 物理動態鎖定</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,27 +23,27 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動最終同步測試</button>
+    <button id="runBtn">啟動動態鎖定測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 最終物理同步
+ * FlipBoardModule - 動態位移補償
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：調整至 -0.25，縮減起始下降衝勁
-            const startY = h * -0.25; 
-            // 📍 終點：提升至 0.22，確保文字在最後與燈管距離適中
-            const endY = h * 0.22; 
+            // 🚩 起點：顯著提高到 -0.50
+            const startY = h * -0.50; 
+            // 📍 終點：調低至 0.28，拉開與燈管的距離
+            const endY = h * 0.28; 
             
-            // ⏱️ 運動時段：1.7s ~ 5.5s
-            if (time < 1.7) return startY;
-            if (time > 5.5) return endY; 
+            // ⏱️ 1.8s ~ 5.0s 完成主要下降
+            if (time < 1.8) return startY;
+            if (time > 5.0) return endY; 
 
-            // 在 3.8 秒內完成這段極緩慢的對位
-            const progress = (time - 1.7) / 3.8; 
+            // 使用平滑線性位移
+            const progress = (time - 1.8) / 3.2; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -62,8 +62,7 @@ function render() {
 
     const signText = document.getElementById('signText').value;
 
-    // 渲染起始時間與 Module 同步為 1.7s
-    if (signText && video.currentTime > 1.7) {
+    if (signText && video.currentTime > 1.8) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
