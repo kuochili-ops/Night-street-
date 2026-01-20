@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 起始高度最終對位</title>
+    <title>NightST - 質感提升版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -22,20 +22,27 @@
 </div>
 
 <div class="controls">
-    <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動起始高度對位</button>
+    <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
+    <button id="runBtn">啟動質感提升測試</button>
 </div>
 
 <script>
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.16; 
+            // 🚩 起點：調整至 -0.20，讓初始位置更高
+            const startY = h * -0.20; 
+            // 📍 終點：維持 0.28
             const endY = h * 0.28; 
+            
             if (time < 1.4) return startY;
             if (time > 5.0) return endY; 
-            const progress = (time - 1.4) / 3.6; 
-            return startY + (endY - startY) * progress;
+
+            // 🎢 加入 Ease-out 緩動：讓接近終點時稍微變慢
+            const linearProgress = (time - 1.4) / 3.6;
+            const easeOutProgress = 1 - Math.pow(1 - linearProgress, 1.5); 
+            
+            return startY + (endY - startY) * easeOutProgress;
         }
     };
 })();
@@ -54,19 +61,26 @@ function render() {
     if (signText && video.currentTime > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
+        
+        // ✨ 增加發光與透明度質感
+        ctx.globalAlpha = 0.9;
         ctx.fillStyle = "#00ff88"; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
-        const fontSize = h * 0.12; 
+        
+        const fontSize = h * 0.10; // 多行文字時稍微縮小字體
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 15;
 
-        const lines = signText.length > 5 ? 
-            [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : 
-            [signText];
+        // 📝 自動分行邏輯
+        const lineLimit = 7;
+        const lines = [];
+        for (let i = 0; i < signText.length; i += lineLimit) {
+            lines.push(signText.slice(i, i + lineLimit));
+        }
             
-        const lineHeight = fontSize * 1.1; 
+        const lineHeight = fontSize * 1.2; 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
