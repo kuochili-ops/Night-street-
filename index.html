@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Precise Top Lock</title>
+    <title>NightST - Absolute Edge Lock</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Top Lock</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Edge Precision</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,27 +27,28 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行精確鎖定同步</button>
+        <button class="btn" id="runBtn">執行極限鎖定同步</button>
     </div>
 </div>
 
 <script>
 const MotionController = {
     /**
-     * 修正細節：
-     * 1. 終點位置 (endY) 提高至 0.10：確保第一行字上緣貼齊綠板頂端。
-     * 2. 起始位置 (startY) 維持 -0.08：確保第二行先露出。
-     * 3. 時間拉長至 3.8s：讓極短距離的位移變得極度緩慢，達到等速感。
+     * 終極修正：
+     * 1. endY 設為 0.01：這代表文字中心點就在畫布頂端，第一行字的上緣絕對會被鎖在最高處。
+     * 2. startY 設為 -0.15：增加俯衝深度，確保第二行先接觸底緣。
+     * 3. 時間維持 3.8s：極短路徑 + 長時間 = 極慢速下降。
      */
     getY: (h, time) => {
-        const startY = h * -0.08; 
-        const endY = h * 0.10; 
+        const startY = h * -0.15; 
+        const endY = h * 0.01; 
         
         if (time < 1.1) return startY;
-        if (time > 4.9) return endY; // 總位移時間拉長
+        if (time > 4.9) return endY;
 
         const progress = (time - 1.1) / 3.8; 
-        const eased = 1 - Math.pow(1 - progress, 2); 
+        // 使用線性度極高的曲線，避免任何末端衝刺感
+        const eased = progress; 
         return startY + (endY - startY) * eased;
     }
 };
