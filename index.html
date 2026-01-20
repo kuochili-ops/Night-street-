@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Layered Text Sync</title>
+    <title>NightST - Absolute Boundary Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -11,29 +11,32 @@
         canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         #mainVideo { display: none; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; }
+        textarea { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; grid-column: span 2; height: 80px; font-size: 1rem; resize: none; }
+        input[type="color"] { width: 100%; height: 45px; border: none; background: none; cursor: pointer; }
         .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Layer Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Boundary Precision</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <input type="text" id="signText" value="第一行&#10;第二行&#10;第三行" placeholder="輸入文字 (支援多行)..." style="grid-column: span 2; height: 60px;">
+        <textarea id="signText">第一行
+第二行
+第三行</textarea>
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行三行同步合成</button>
+        <button class="btn" id="runBtn">啟動座標同步預覽</button>
     </div>
 </div>
 
 <script>
 /**
- * FlipBoard 模組：處理三行文字的空間鎖定與同步位移
+ * FlipBoard 模組：精確計算文字下邊界與運鏡同步
  */
 const FlipBoardModule = (() => {
     return {
@@ -42,25 +45,27 @@ const FlipBoardModule = (() => {
             cvs.width = w; cvs.height = h;
             const x = cvs.getContext('2d');
             
+            // 看板底色：保持極黑以利合成
             x.fillStyle = "rgba(5, 8, 5, 0.98)";
             x.fillRect(0, 0, w, h);
 
-            // 解析多行文字（支援 \n 或換行符號）
             const lines = text.split('\n').filter(l => l.trim() !== "");
-            const fontSize = h * (lines.length > 2 ? 0.09 : 0.15); // 三行時縮小字體
+            const fontSize = h * (lines.length > 2 ? 0.08 : 0.14);
             const lineHeight = fontSize * 1.3;
             const totalHeight = lines.length * lineHeight;
 
             /**
-             * 物理軌跡計算：
-             * 0.62s 時，文字區塊的「底部」位於 y = 0 (不可見)
-             * 2.10s 時，文字區塊的「中心」位於看板中心 y = 0.44h
+             * 核心修正：
+             * 0.62s 時，文字區塊的「下邊緣」必須剛好在 y = -5 (幾乎不可見)。
+             * 這樣才不會在影片剛開始時覆蓋到下方的孔雀招牌。
              */
             let centerY;
             const startTime = 0.62;
             const targetTime = 2.1;
-            const finalCenterY = h * 0.44; 
-            const initialCenterY = -(totalHeight / 2); // 中心點在上方，底邊切齊 0
+            const finalCenterY = h * 0.44;
+            
+            // 初始中心點 = -(文字總高/2) - 10 像素偏移，確保底邊完全在畫布外
+            const initialCenterY = -(totalHeight / 2) - 10; 
 
             if (time < startTime) {
                 centerY = initialCenterY;
@@ -71,7 +76,7 @@ const FlipBoardModule = (() => {
                 centerY = finalCenterY;
             }
 
-            // 閃爍特效 (2.5s 開始)
+            // 啟動點滅特效 (2.5s 後)
             const intensity = (time >= 2.5 && time < 3.4) ? (Math.random() > 0.4 ? 1 : 0.1) : 1;
 
             if (lines.length > 0) {
@@ -90,9 +95,10 @@ const FlipBoardModule = (() => {
             }
             return cvs;
         },
-        // 偵測綠色並保護下方招牌
+        // 偵測綠色並保護下方招牌區域
         isTargetGreen: (r, g, b, y, canvasH) => {
-            return (y < canvasH * 0.58) && (g > 45 && g > r * 1.3 && g > b * 1.1); //
+            // 嚴格限制：y 必須在畫面上半部，且符合看板綠色特徵
+            return (y < canvasH * 0.52) && (g > 45 && g > r * 1.3 && g > b * 1.1);
         }
     };
 })();
@@ -119,8 +125,8 @@ function render() {
         );
         const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 在看板露頭後啟動，並保護下方的直式招牌
-        if (video.currentTime > 0.6) {
+        // 在 0.62 秒看板進入後啟動，並排除畫面的下半部
+        if (video.currentTime > 0.62) {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
                     const i = (y * canvas.width + x) * 4;
