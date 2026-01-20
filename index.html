@@ -2,58 +2,53 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Final Locked Sync</title>
+    <title>NightST - Precise Boundary Fix</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; }
         .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px; }
         canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         #mainVideo { display: none; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; outline: none; }
-        input:focus { border-color: var(--accent); }
-        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; font-size: 18px; transition: 0.2s; }
-        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; }
+        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; font-size: 18px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent); letter-spacing: 1px;">NightST - FINAL SYNC</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Boundary</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <input type="text" id="signText" value="這是第二次測試" placeholder="輸入招牌文字..." style="grid-column: span 2;">
+        <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行同步合成</button>
+        <button class="btn" id="runBtn">執行精確鎖定</button>
     </div>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 處理物理同步位移
+ * 針對「下降過頭」的物理修正
  */
 const FlipBoardModule = (() => {
     return {
-        // 核心同步邏輯：文字隨綠板下降
-        // startY: 畫面頂部外 (-0.25)
-        // endY: 日光燈下方定點 (0.18)
+        // endY 從 0.18 調高至 0.13，確保文字不會掉得太深
+        // 停止時間提前至 3.6s，匹配招牌停穩的瞬間
         getY: (h, time) => {
             const startY = h * -0.25; 
-            const endY = h * 0.18; 
+            const endY = h * 0.13; 
             
             if (time < 1.1) return startY;
-            // 3.8秒運鏡停止，座標鎖死在 endY
-            if (time > 3.8) return endY;
+            if (time > 3.6) return endY; 
 
-            const progress = (time - 1.1) / 2.7; 
-            // 使用 Ease-Out 曲線，確保下降到定點時是平滑停住的
-            const eased = 1 - Math.pow(1 - progress, 2); 
-            return startY + (endY - startY) * eased;
+            const progress = (time - 1.1) / 2.5; 
+            // 保持線性，確保與綠板等速下降
+            return startY + (endY - startY) * progress;
         }
     };
 })();
@@ -67,8 +62,6 @@ function render() {
 
     const w = canvas.width;
     const h = canvas.height;
-    
-    // 1. 繪製背景影片
     ctx.drawImage(video, 0, 0, w, h);
 
     const signText = document.getElementById('signText').value;
@@ -76,26 +69,20 @@ function render() {
 
     if (signText && video.currentTime > 1.1) {
         ctx.save();
-        
-        // 2. 獲取當前鎖定座標
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
-        // 3. 霓虹燈點滅動畫 (3.2s - 4.2s 之間閃爍)
         let intensity = 1;
-        if (video.currentTime > 3.2 && video.currentTime < 4.2) {
+        if (video.currentTime > 3.0 && video.currentTime < 4.2) {
             intensity = Math.random() > 0.4 ? 1 : 0.15;
         }
 
-        // 4. 文字樣式設定
         ctx.globalAlpha = intensity;
         ctx.fillStyle = textColor;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         
-        const fontSize = h * 0.15;
-        ctx.font = `900 ${fontSize}px "Microsoft JhengHei", sans-serif`;
-        
-        // 強化發光感
+        const fontSize = h * 0.14; 
+        ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = textColor;
         ctx.shadowBlur = 25 * intensity;
 
@@ -105,7 +92,6 @@ function render() {
             
         const lineHeight = fontSize * 1.3;
 
-        // 5. 繪製文字
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -117,7 +103,6 @@ function render() {
 }
 
 document.getElementById('runBtn').addEventListener('click', () => {
-    // 確保畫布解析度與影片一致
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     video.currentTime = 0;
