@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 慢速同步測試</title>
+    <title>NightST - 物理位移校準</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,35 +18,36 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - 慢速物理對位</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - 物理位移校準 🛠️</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <input type="text" id="signText" value="輸入文字測試慢速降落" style="grid-column: span 2;">
+        <input type="text" id="signText" value="輸入文字觀察下降" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#00ff88">
-        <button class="btn" id="runBtn">啟動測試</button>
+        <button class="btn" id="runBtn">啟動同步測試</button>
     </div>
 </div>
 
 <script>
+/**
+ * FlipBoardModule - 處理物理同步位移
+ */
 const FlipBoardModule = (() => {
     return {
-        /**
-         * 慢速下降邏輯：
-         * 縮短 startY 到 endY 的距離，讓文字在 2.4 秒內移動更短的路徑。
-         */
         getY: (h, time) => {
-            const startY = h * 0.05; // 從燈管上方較近處開始
-            const endY = h * 0.11;   // 停在燈管下方
+            // 🚩 起點設在更高處，確保「往下掉」的動態感比鏡頭移動更快
+            const startY = h * -0.10; 
+            // 📍 終點下調至 0.15，確保停在日光燈管下方
+            const endY = h * 0.15; 
             
             if (time < 1.1) return startY;
             if (time > 3.5) return endY; 
 
             const progress = (time - 1.1) / 2.4; 
-            return startY + (endY - startY) * progress; // 線性平移
+            return startY + (endY - startY) * progress;
         }
     };
 })();
@@ -71,18 +72,19 @@ function render() {
         
         ctx.fillStyle = textColor;
         ctx.textAlign = "center";
-        ctx.textBaseline = "top"; // 以第一行上緣為基準點
+        ctx.textBaseline = "top"; // ⚓ 固定第一行上緣為基準
         
         const fontSize = h * 0.14; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = textColor;
         ctx.shadowBlur = 20;
 
+        // 文字分行
         const lines = signText.length > 6 ? 
             [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : 
             [signText];
             
-        const lineHeight = fontSize * 1.1; // 緊湊行距
+        const lineHeight = fontSize * 1.1; // 📏 緊湊行距
 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
