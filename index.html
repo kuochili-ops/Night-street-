@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 高位出現同步校準</title>
+    <title>NightST - 出現點位校準</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -22,27 +22,27 @@
 </div>
 
 <div class="controls">
-    <input type="text" id="signText" value="高位同步測試">
-    <button id="runBtn">啟動測試</button>
+    <input type="text" id="signText" value="高位出現同步測試">
+    <button id="runBtn">啟動鎖定測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 高位出現與同步
+ * FlipBoardModule - 精確位移校準
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：調高至 0.05，讓文字從綠板較上方處出現
-            const startY = h * 0.05; 
-            // 📍 終點：微調至 0.32，確保最終位置穩固
-            const endY = h * 0.32; 
+            // 🚩 起點調高，確保文字從頂部切入
+            const startY = h * -0.10; 
+            // 📍 終點設在燈管下方的適中位置
+            const endY = h * 0.28; 
             
-            // ⏱️ 微調開始時間至 1.4s
-            if (time < 1.4) return startY;
+            // ⏱️ 延後至 1.6 秒開始，配合綠板下緣的出現
+            if (time < 1.6) return startY;
             if (time > 5.0) return endY; 
 
-            const progress = (time - 1.4) / 3.6; 
+            const progress = (time - 1.6) / 3.4; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -61,8 +61,8 @@ function render() {
 
     const signText = document.getElementById('signText').value;
 
-    // 同步渲染延後
-    if (signText && video.currentTime > 1.4) {
+    // 渲染起始時間與 Module 同步
+    if (signText && video.currentTime > 1.6) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
