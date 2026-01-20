@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 強力物理鎖定測試</title>
+    <title>NightST - 減緩物理同步測試</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -22,26 +22,27 @@
 </div>
 
 <div class="controls">
-    <input type="text" id="signText" value="強力物理鎖定校準">
-    <button id="runBtn">啟動鎖定測試</button>
+    <input type="text" id="signText" value="減緩下降同步測試">
+    <button id="runBtn">啟動減緩測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 極限物理鎖定
+ * FlipBoardModule - 減緩移動速度
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：大幅拉高，增加初始切入速度
-            const startY = h * -0.60; 
-            // 📍 終點：設為 0.42，確保完全避開燈管，停在綠板偏下位置
-            const endY = h * 0.42; 
+            // 🚩 起點：縮小到 -0.20，減少下降的初速度
+            const startY = h * -0.20; 
+            // 📍 終點：微調至 0.35，尋找最完美的物理平衡點
+            const endY = h * 0.35; 
             
-            // ⏱️ 提前開始 (0.8s)，延後結束 (5.0s)，覆蓋整個攀升過程
+            // ⏱️ 運動時段：0.8s ~ 5.0s
             if (time < 0.8) return startY;
             if (time > 5.0) return endY; 
 
+            // 在 4.2 秒內完成這段短距離位移，速度會變得非常慢
             const progress = (time - 0.8) / 4.2; 
             return startY + (endY - startY) * progress;
         }
