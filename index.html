@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Precise Boundary Sync</title>
+    <title>NightST - Precise Boundary Entry</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Motion Tracking V5</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Boundary Entry</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -32,9 +32,6 @@
 </div>
 
 <script>
-/**
- * FlipBoard 模組：處理精確邊界與速率同步
- */
 const FlipBoardModule = (() => {
     return {
         getSyncedTexture: (text, w, h, color, time) => {
@@ -42,35 +39,37 @@ const FlipBoardModule = (() => {
             cvs.width = w; cvs.height = h;
             const x = cvs.getContext('2d');
             
-            // 看板底色
             x.fillStyle = "rgba(5, 8, 5, 0.98)";
             x.fillRect(0, 0, w, h);
 
             /**
-             * 座標同步邏輯:
-             * 1. 看板 0.62s 出現。
-             * 2. 文字下邊界 (startY + fontSize/2) 必須在 0.62s 時位於 y = 0。
-             * 3. 隨著鏡頭上升（看板向下移），yPos 隨時間增加。
+             * 修正後的座標軌跡：
+             * 看板在 0.62s 從頂部切入。
+             * 為了讓文字「跟著看板降落」，我們計算文字區塊的總高度。
              */
-            let yPos;
+            let lines = text.length > 6 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
+            let fontSize = text.length > 6 ? h * 0.12 : h * 0.18;
+            const lineHeight = fontSize * 1.3;
+            const totalTextHeight = lines.length * lineHeight;
+
+            let yPos; // 文字中心點的 Y 座標
             const startTime = 0.62;
-            const targetTime = 2.1; // 看板完全到位時間
-            const targetY = h * 0.44; // 看板在畫面最終的中心 Y 座標
+            const targetTime = 2.1; 
+            const targetY = h * 0.44; // 最終中心位置
 
             if (time < startTime) {
-                // 文字隱藏在畫布上方外
-                yPos = -h; 
+                // 初始位置：中心點在畫布上方，且底部剛好碰到 y=0
+                // yPos = -(文字半高) 確保底邊切齊 0
+                yPos = -(totalTextHeight / 2); 
             } else if (time < targetTime) {
-                // 根據鏡頭速率計算：從邊界切入到中心定位
                 const progress = (time - startTime) / (targetTime - startTime);
-                // 起始 yPos 應該讓文字底部剛好碰到 y=0
-                const initialY = - (h * 0.1); 
-                yPos = initialY + (targetY - initialY) * progress;
+                const startY = -(totalTextHeight / 2);
+                yPos = startY + (targetY - startY) * progress;
             } else {
                 yPos = targetY;
             }
 
-            // 啟動點滅特效 (2.5s 後穩定或閃爍)
+            // 閃爍特效
             let intensity = (time >= 2.5 && time < 3.4) ? (Math.random() > 0.4 ? 1 : 0.1) : 1;
 
             if (text) {
@@ -78,25 +77,20 @@ const FlipBoardModule = (() => {
                 x.fillStyle = color;
                 x.textAlign = "center";
                 x.textBaseline = "middle";
-                
-                let lines = text.length > 5 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
-                let fontSize = text.length > 5 ? h * 0.11 : h * 0.17;
                 x.font = `900 ${fontSize}px sans-serif`;
                 x.shadowColor = color;
                 x.shadowBlur = 20;
 
-                const lineHeight = fontSize * 1.3;
                 const drawStartY = yPos - ((lines.length - 1) * lineHeight / 2);
-
                 lines.forEach((line, index) => {
                     x.fillText(line, w / 2, drawStartY + (index * lineHeight));
                 });
             }
             return cvs;
         },
-        // 保護下方直式招牌：鎖定上半部與顏色特徵
         isTargetGreen: (r, g, b, y, canvasH) => {
-            return (y < canvasH * 0.6) && (g > 45 && g > r * 1.25 && g > b * 1.05);
+            // 嚴格過濾：只針對畫面上半部，保護下方直式招牌
+            return (y < canvasH * 0.55) && (g > 45 && g > r * 1.3 && g > b * 1.1);
         }
     };
 })();
@@ -123,8 +117,8 @@ function render() {
         );
         const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 僅在看板進入後啟動合成，並保護下方的直式招牌
-        if (video.currentTime > 0.62) {
+        // 僅在 0.62 秒看板露頭後啟動，並保護下方的直式招牌
+        if (video.currentTime > 0.6) {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
                     const i = (y * canvas.width + x) * 4;
@@ -139,7 +133,6 @@ function render() {
         }
     }
 
-    // 影片結束前 3s 右下角出現圖片
     if (video.currentTime >= 3.0) {
         const imgW = canvas.width * 0.22;
         const imgH = (cornerImg.height / cornerImg.width) * imgW;
