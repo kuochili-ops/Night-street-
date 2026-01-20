@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Motion Tracking Sync</title>
+    <title>NightST - Perfect Motion Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Motion Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Motion Tracking Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,13 +27,13 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" placeholder="請輸入文字..." style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">啟動速率同步合成</button>
+        <button class="btn" id="runBtn">啟動速率同步預覽</button>
     </div>
 </div>
 
 <script>
 /**
- * FlipBoard 模組：同步運鏡位移與排版調整
+ * FlipBoard 模組：同步位移與日光燈起動特效
  */
 const FlipBoardModule = (() => {
     return {
@@ -46,26 +46,30 @@ const FlipBoardModule = (() => {
             x.fillRect(0, 0, w, h);
 
             /**
-             * 速率同步核心邏輯：
-             * 根據影片，看板在 0.8s 左右從上方露頭，在 2.5s 左右到達畫面中心 (0.45h)
-             * 我們讓文字的 Y 座標在 0.8s 時處於 -0.2h (隱藏)，
-             * 隨時間線性移動到 2.5s 時的 0.44h 位置。
+             * 核心修正：減緩移動速率
+             * 根據影片動態，看板在 0.9s 到 2.1s 之間位移最明顯
+             * 起始點 y 設為 -0.15h，終點 y 設為 0.44h
              */
             let yPos;
-            if (time < 0.8) {
-                yPos = h * -0.2; 
-            } else if (time < 2.5) {
-                const progress = (time - 0.8) / (2.5 - 0.8);
-                // 從頂部外 ( -0.2 ) 移動到目標位置 ( 0.44 )
-                yPos = h * (-0.2 + (0.44 - (-0.2)) * progress);
+            const startTime = 0.9;
+            const endTime = 2.1;
+            const startY = h * -0.15;
+            const targetY = h * 0.44;
+
+            if (time < startTime) {
+                yPos = startY; 
+            } else if (time < endTime) {
+                // 使用線性插值計算當前應有的高度
+                const progress = (time - startTime) / (endTime - startTime);
+                yPos = startY + (targetY - startY) * progress;
             } else {
-                yPos = h * 0.44; // 2.5s 後固定在看板中心位置
+                yPos = targetY; 
             }
 
-            // 啟動閃爍特效 (2.5s 開始)
+            // 日光燈起動點滅特效 (2.5s 開始)
             let intensity = 1;
             if (time >= 2.5 && time < 3.4) {
-                intensity = Math.random() > 0.4 ? 1 : 0.15;
+                intensity = Math.random() > 0.45 ? 1 : 0.1;
             }
 
             if (text) {
@@ -74,7 +78,7 @@ const FlipBoardModule = (() => {
                 x.textAlign = "center";
                 x.textBaseline = "middle";
                 
-                // 根據字數多寡做調整：自動分行與縮放
+                // 根據字數調整分行與大小
                 let lines = text.length > 5 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
                 let fontSize = text.length > 5 ? h * 0.11 : h * 0.17;
                 x.font = `900 ${fontSize}px sans-serif`;
@@ -82,18 +86,18 @@ const FlipBoardModule = (() => {
                 x.shadowBlur = 25;
 
                 const lineHeight = fontSize * 1.3;
-                const startY = yPos - ((lines.length - 1) * lineHeight / 2);
+                const drawStartY = yPos - ((lines.length - 1) * lineHeight / 2);
 
                 lines.forEach((line, index) => {
-                    x.fillText(line, w / 2, startY + (index * lineHeight));
+                    x.fillText(line, w / 2, drawStartY + (index * lineHeight));
                 });
             }
             return cvs;
         },
-        // 偵測綠色並保護下方招牌
+        // 偵測綠色並嚴格保護下方直式招牌區域
         isTargetGreen: (r, g, b, y, canvasH) => {
-            // 只掃描畫面上半部 (y < 60%) 以避開下方的直式招牌
-            return (y < canvasH * 0.6) && (g > 50 && g > r * 1.25 && g > b * 1.05);
+            // 限制僅掃描畫面上半部 (y < 60%)，徹底避開下方的孔雀燈招牌
+            return (y < canvasH * 0.6) && (g > 45 && g > r * 1.3 && g > b * 1.1);
         }
     };
 })();
@@ -120,7 +124,7 @@ function render() {
         );
         const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 僅在 1.2s 後啟動合成（完全避開一開始直式招牌的特寫）
+        // 在影片 1.2s 後啟動，確保直式招牌特寫時不變色
         if (video.currentTime > 1.2) {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
@@ -136,6 +140,7 @@ function render() {
         }
     }
 
+    // 影片結束前 3 秒顯示右下角圖片
     if (video.currentTime >= 3.0) {
         const imgW = canvas.width * 0.22;
         const imgH = (cornerImg.height / cornerImg.width) * imgW;
