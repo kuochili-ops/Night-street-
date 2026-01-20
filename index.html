@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 極致高位同步測試</title>
+    <title>NightST - 極致高位同步校準</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,26 +23,26 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動物理鎖定測試</button>
+    <button id="runBtn">啟動極致同步測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 極致高位同步
+ * FlipBoardModule - 高位鎖定同步
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：顯著拉高，確保從綠板最上方切入
+            // 🚩 起點：顯著拉高到 -0.35，確保文字從高位切入
             const startY = h * -0.35; 
-            // 📍 終點：精確停在燈管下方
-            const endY = h * 0.25; 
+            // 📍 終點：精確停在 0.28
+            const endY = h * 0.28; 
             
-            // ⏱️ 延後至 1.8 秒開始，確保綠板下緣先行
-            if (time < 1.8) return startY;
+            // ⏱️ 延後至 1.7 秒開始
+            if (time < 1.7) return startY;
             if (time > 5.0) return endY; 
 
-            const progress = (time - 1.8) / 3.2; 
+            const progress = (time - 1.7) / 3.3; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -61,8 +61,8 @@ function render() {
 
     const signText = document.getElementById('signText').value;
 
-    // 渲染起始時間與 Module 同步為 1.8s
-    if (signText && video.currentTime > 1.8) {
+    // 渲染起始時間與 Module 同步為 1.7s
+    if (signText && video.currentTime > 1.7) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
@@ -75,7 +75,6 @@ function render() {
         ctx.shadowColor = "#00ff88";
         ctx.shadowBlur = 20;
 
-        // 文字處理
         const lines = signText.length > 5 ? 
             [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : 
             [signText];
