@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 質感提升版</title>
+    <title>NightST - 初始高度與圖片整合</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,26 +23,27 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
-    <button id="runBtn">啟動質感提升測試</button>
+    <button id="runBtn">啟動高度與圖片測試</button>
 </div>
 
 <script>
+// 🖼️ 預載右下角圖片
+const cornerImg = new Image();
+cornerImg.src = 'IMG_6604.png'; 
+
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：調整至 -0.20，讓初始位置更高
-            const startY = h * -0.20; 
-            // 📍 終點：維持 0.28
+            // 🚩 起點：調整至 -0.25，讓出現位置更高
+            const startY = h * -0.25; 
+            // 📍 終點：維持在 0.28，避開燈管
             const endY = h * 0.28; 
             
             if (time < 1.4) return startY;
             if (time > 5.0) return endY; 
 
-            // 🎢 加入 Ease-out 緩動：讓接近終點時稍微變慢
-            const linearProgress = (time - 1.4) / 3.6;
-            const easeOutProgress = 1 - Math.pow(1 - linearProgress, 1.5); 
-            
-            return startY + (endY - startY) * easeOutProgress;
+            const progress = (time - 1.4) / 3.6; 
+            return startY + (endY - startY) * progress;
         }
     };
 })();
@@ -56,29 +57,24 @@ function render() {
     const w = canvas.width;
     const h = canvas.height;
     ctx.drawImage(video, 0, 0, w, h);
+    
+    const time = video.currentTime;
     const signText = document.getElementById('signText').value;
 
-    if (signText && video.currentTime > 1.4) {
+    // 🟢 繪製綠板文字 (1.4s 開始)
+    if (signText && time > 1.4) {
         ctx.save();
-        const currentY = FlipBoardModule.getY(h, video.currentTime);
-        
-        // ✨ 增加發光與透明度質感
-        ctx.globalAlpha = 0.9;
+        const currentY = FlipBoardModule.getY(h, time);
         ctx.fillStyle = "#00ff88"; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
-        
-        const fontSize = h * 0.10; // 多行文字時稍微縮小字體
+        const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 20;
 
-        // 📝 自動分行邏輯
-        const lineLimit = 7;
-        const lines = [];
-        for (let i = 0; i < signText.length; i += lineLimit) {
-            lines.push(signText.slice(i, i + lineLimit));
-        }
+        const lines = signText.length > 7 ? 
+            [signText.slice(0, 7), signText.slice(7)] : [signText];
             
         const lineHeight = fontSize * 1.2; 
         lines.forEach((line, index) => {
@@ -86,6 +82,17 @@ function render() {
         });
         ctx.restore();
     }
+
+    // 🖼️ 繪製右下角圖片 (3.0s 開始)
+    if (time >= 3.0) {
+        ctx.save();
+        const imgW = w * 0.25; // 寬度設為畫面的 25%
+        const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
+        const padding = 20;
+        ctx.drawImage(cornerImg, w - imgW - padding, h - imgH - padding, imgW, imgH);
+        ctx.restore();
+    }
+    
     requestAnimationFrame(render);
 }
 
