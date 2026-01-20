@@ -2,48 +2,48 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 物理位移微調測試</title>
+    <title>NightST - 物理對位實驗</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
-        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; }
-        .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px; }
-        canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; }
+        canvas, video { position: absolute; width: 100%; height: 100%; }
         #mainVideo { display: none; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input { padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; }
-        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; font-size: 18px; }
+        .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
+        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; }
+        button { padding: 15px; background: var(--accent); color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - 物理位移微調 🛠️</h2>
-    <div class="view-port">
-        <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
-        <canvas id="compCanvas"></canvas>
-    </div>
+<div class="view-port">
+    <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
+    <canvas id="compCanvas"></canvas>
+</div>
 
-    <div class="controls">
-        <input type="text" id="signText" value="由上往下降落測試" style="grid-column: span 2;">
-        <input type="color" id="textColor" value="#00ff88">
-        <button class="btn" id="runBtn">啟動同步測試</button>
-    </div>
+<div class="controls">
+    <input type="text" id="signText" value="物理順序校正測試">
+    <button id="runBtn">啟動物理同步測試</button>
 </div>
 
 <script>
+/**
+ * FlipBoardModule - 物理同步位移
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點再拉高，增加下降的速度感
-            const startY = h * -0.30; 
-            // 📍 終點設為 0.28，確保文字第一行頂端低於燈管
-            const endY = h * 0.28; 
+            // 🚩 起點拉高：模擬文字隨綠板從上方快速切入
+            const startY = h * -0.5; 
+            // 📍 終點下調：補償鏡頭向上的位移
+            const endY = h * 0.35; 
             
-            if (time < 1.1) return startY;
+            if (time < 1.0) return startY;
             if (time > 3.5) return endY; 
 
-            const progress = (time - 1.1) / 2.4; 
+            // 計算 1.0s 到 3.5s 之間的線性位移
+            // 較長的距離與較短的時間會產生更快的視覺速度
+            const progress = (time - 1.0) / 2.5; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -61,22 +61,22 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
 
     const signText = document.getElementById('signText').value;
-    const textColor = document.getElementById('textColor').value;
 
-    if (signText && video.currentTime > 1.1) {
+    if (signText && video.currentTime > 1.0) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
-        ctx.fillStyle = textColor;
+        ctx.fillStyle = "#00ff88"; // 綠色發光
         ctx.textAlign = "center";
-        ctx.textBaseline = "top"; // ⚓ 以第一行上緣為基準
+        ctx.textBaseline = "top"; 
         
-        const fontSize = h * 0.14; 
+        const fontSize = h * 0.12; 
         ctx.font = `900 ${fontSize}px sans-serif`;
-        ctx.shadowColor = textColor;
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = "#00ff88";
+        ctx.shadowBlur = 15;
 
-        const lines = signText.length > 6 ? 
+        // 文字分行
+        const lines = signText.length > 5 ? 
             [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : 
             [signText];
             
