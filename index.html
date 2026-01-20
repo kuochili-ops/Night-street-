@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 高度最終精修</title>
+    <title>NightST - 燈管避讓校準</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,25 +23,18 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動高度精修測試</button>
+    <button id="runBtn">啟動避讓測試</button>
 </div>
 
 <script>
-/**
- * FlipBoardModule - 高度精細化同步
- */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：調高至 -0.15，讓文字更早與綠板上緣接觸
-            const startY = h * -0.15; 
-            // 📍 終點：上移至 0.18，鎖定在高位
-            const endY = h * 0.18; 
-            
-            if (time < 1.4) return startY;
+            const startY = h * -0.05; 
+            const endY = h * 0.28; 
+            if (time < 1.2) return startY;
             if (time > 5.0) return endY; 
-
-            const progress = (time - 1.4) / 3.6; 
+            const progress = (time - 1.2) / 3.8; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -58,7 +51,7 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     const signText = document.getElementById('signText').value;
 
-    if (signText && video.currentTime > 1.4) {
+    if (signText && video.currentTime > 1.2) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         ctx.fillStyle = "#00ff88"; 
