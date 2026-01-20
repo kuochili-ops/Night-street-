@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 燈管避讓校準</title>
+    <title>NightST - 初始位置校準</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,18 +23,26 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動避讓測試</button>
+    <button id="runBtn">啟動初始位置校準</button>
 </div>
 
 <script>
+/**
+ * FlipBoardModule - 初始位置與最終高度同步
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.05; 
+            // 🚩 起點：調高至 -0.20，確保出現時位置更高
+            const startY = h * -0.20; 
+            // 📍 終點：維持在 0.28，確保不遮擋燈管
             const endY = h * 0.28; 
-            if (time < 1.2) return startY;
+            
+            // ⏱️ 時間鎖定：1.4s ~ 5.0s
+            if (time < 1.4) return startY;
             if (time > 5.0) return endY; 
-            const progress = (time - 1.2) / 3.8; 
+
+            const progress = (time - 1.4) / 3.6; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -51,7 +59,8 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     const signText = document.getElementById('signText').value;
 
-    if (signText && video.currentTime > 1.2) {
+    // 使用我們鎖定的 1.4s 作為渲染起點
+    if (signText && video.currentTime > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         ctx.fillStyle = "#00ff88"; 
