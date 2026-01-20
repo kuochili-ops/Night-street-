@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Text Motion Sync</title>
+    <title>NightST - Physics Motion Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Pure Motion Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Smooth Motion</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -28,54 +28,52 @@
         <textarea id="signText">第一行文字
 第二行文字</textarea>
         <input type="color" id="textColor" value="#00ff88" style="width:100%; height:45px; border:none; background:none; cursor:pointer;">
-        <button class="btn" id="runBtn">啟動物理同步</button>
+        <button class="btn" id="runBtn">啟動緩動同步</button>
     </div>
 </div>
 
 <script>
-/**
- * FlipBoardModule: 專注於座標位移與繪製清晰度
- */
 const FlipBoardModule = (() => {
     return {
         drawSyncedText: (ctx, text, w, h, color, time) => {
             const lines = text.split('\n').filter(l => l.trim() !== "");
             if (lines.length === 0) return;
 
-            // 1. 計算文字大小與總高度
             const fontSize = h * (lines.length > 2 ? 0.08 : 0.12);
             const lineHeight = fontSize * 1.3;
             const totalHeight = lines.length * lineHeight;
 
             /**
-             * 2. 物理座標計算:
-             * - 0.62s: 文字底邊在 y=0 (centerY = -totalHeight/2)
-             * - 2.10s: 文字中心在 y=0.44h
+             * 物理座標優化:
+             * - startTime: 0.62 (看板露出)
+             * - targetTime: 2.50 (延後時間，減緩速度)
+             * - initialCenterY: 底邊切齊 y=0
              */
             const startTime = 0.62;
-            const targetTime = 2.10;
+            const targetTime = 2.50; 
             const initialCenterY = -(totalHeight / 2);
-            const finalCenterY = h * 0.44;
+            const finalCenterY = h * 0.42; 
 
             let centerY;
             if (time < startTime) {
                 centerY = initialCenterY;
             } else if (time < targetTime) {
                 const progress = (time - startTime) / (targetTime - startTime);
-                // 使用平滑曲線模擬鏡頭加速
-                centerY = initialCenterY + (finalCenterY - initialCenterY) * progress;
+                
+                // 使用 Ease-Out 緩動公式：讓結尾變慢
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                centerY = initialCenterY + (finalCenterY - initialCenterY) * easeOut;
             } else {
                 centerY = finalCenterY;
             }
 
-            // 3. 繪製高品質文字
             ctx.save();
             ctx.fillStyle = color;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.font = `900 ${fontSize}px sans-serif`;
             
-            // 模擬霓虹發光感
             ctx.shadowColor = color;
             ctx.shadowBlur = 15;
 
@@ -95,13 +93,11 @@ const ctx = canvas.getContext('2d');
 function render() {
     if (video.paused || video.ended) return;
 
-    // 直接繪製影片，確保背景清晰
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const signInput = document.getElementById('signText').value;
     const textColor = document.getElementById('textColor').value;
     
-    // 呼叫同步繪製
     FlipBoardModule.drawSyncedText(ctx, signInput, canvas.width, canvas.height, textColor, video.currentTime);
 
     // 右下角固定的製作資訊
@@ -120,7 +116,6 @@ function render() {
 }
 
 document.getElementById('runBtn').addEventListener('click', () => {
-    // 鎖定原生解析度
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     video.currentTime = 0;
