@@ -2,10 +2,10 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Physics Alignment V6</title>
+    <title>NightST - Ultra Precision Alignment</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
-        body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; }
         .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid #222; margin-bottom: 20px; }
         canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Early Detection</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Ultra Fast Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -44,13 +44,17 @@ const FlipBoardModule = (() => {
             x.fillStyle = "rgba(5, 8, 5, 0.98)";
             x.fillRect(0, 0, w, h);
 
-            // 調整起始 Y：1.1s 時就在 15% 高度，確保底部第一時間出現
+            /**
+             * 調整重點：
+             * 起始 Y = 25% 高度。
+             * 運動時間：0.8s 開始，1.8s 結束 (僅 1 秒完成降落)。
+             */
             let yOffset = h * 0.44; 
-            if (time < 2.8) {
-                const progress = Math.max(0, (time - 1.1) / 1.7);
-                // 使用 Ease-In-Out 模擬真實運鏡的停頓感
-                const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                yOffset = (h * 0.15) + (h * 0.29 * eased); 
+            if (time < 1.8) {
+                const progress = Math.max(0, (time - 0.8) / 1.0);
+                // 使用 Cubic Ease-Out 讓文字降落更有加速度感
+                const eased = 1 - Math.pow(1 - progress, 3);
+                yOffset = (h * 0.25) + (h * 0.19 * eased); 
             }
 
             let intensity = 1;
@@ -65,13 +69,13 @@ const FlipBoardModule = (() => {
                 let fontSize = text.length > 6 ? h * 0.11 : h * 0.16;
                 x.font = `900 ${fontSize}px sans-serif`;
                 x.shadowColor = color; x.shadowBlur = 25;
-                const lineHeight = fontSize * 1.35;
+                const lineHeight = fontSize * 1.3;
                 const startY = yOffset - ((lines.length - 1) * lineHeight / 2);
                 lines.forEach((line, index) => { x.fillText(line, w / 2, startY + (index * lineHeight)); });
             }
             return cvs;
         },
-        isBillboardArea: (r, g, b, y, canvasH) => (y < canvasH * 0.6) && (g > 50 && g > r * 1.3 && g > b * 1.1)
+        isBillboardArea: (r, g, b, y, canvasH) => (y < canvasH * 0.55) && (g > 50 && g > r * 1.3 && g > b * 1.1)
     };
 })();
 
@@ -90,8 +94,8 @@ function render() {
         const textLayer = FlipBoardModule.getSyncedTexture(signInput, canvas.width, canvas.height, document.getElementById('textColor').value, video.currentTime);
         const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 提早至 1.2s 啟動，捕捉進入畫面的第一瞬間
-        if (video.currentTime > 1.2) {
+        // 提早至 0.9s 啟動掃描，確保捕捉看板邊緣進入的第一刻
+        if (video.currentTime > 0.9) {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
                     const i = (y * canvas.width + x) * 4;
