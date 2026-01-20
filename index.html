@@ -2,23 +2,25 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST 霓虹啟動特效版</title>
+    <title>NightST Neon Messenger - Ultimate</title>
     <style>
-        :root { --accent: #00ff88; --bg: #0a0a0a; }
-        body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 800px; width: 100%; background: #1a1a1a; padding: 25px; border-radius: 12px; }
-        .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+        :root { --accent: #00ff88; --bg: #050505; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 20px; border: 1px solid #222; }
         canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        #mainVideo { visibility: hidden; }
+        #mainVideo { display: none; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input { padding: 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; }
-        .btn { padding: 15px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; font-size: 1rem; }
+        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; transition: 0.2s; }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .hint { font-size: 0.8rem; color: #666; text-align: center; margin-top: 10px; line-height: 1.6; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="color:var(--accent)">NightST Neon Starter</h2>
+    <h2 style="margin-top:0; color:var(--accent);">NightST Ultimate Editor</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,46 +29,49 @@
     <div class="controls">
         <input type="text" id="signText" placeholder="輸入招牌文字..." style="grid-column: span 2;">
         <input type="color" id="textColor" value="#00ff88">
-        <button class="btn" id="runBtn">啟動並觀看特效</button>
+        <button class="btn" id="runBtn">開始播放並合成</button>
+    </div>
+    <div class="hint">
+        • 文字預先定位，2.5s 啟動點滅特效<br>
+        • 影片結束前 3s (3.0s-6.0s) 右下角顯示 IMG_6604.png
     </div>
 </div>
 
 <script>
 /**
- * FlipBoard 模組：增加燈管啟動點滅邏輯
+ * FlipBoard 模組：處理所有圖像與文字合成邏輯
  */
 const FlipBoardModule = (() => {
     return {
-        // 生成文字層，並根據 time 決定是否點滅
-        generateDynamicTexture: (text, w, h, color, time) => {
+        // 生成動態霓虹文字貼圖
+        getNeonFrame: (text, w, h, color, time) => {
             const cvs = document.createElement('canvas');
             cvs.width = w; cvs.height = h;
             const x = cvs.getContext('2d');
             
-            // 基礎底色
-            x.fillStyle = "rgba(10, 15, 10, 0.95)";
+            x.fillStyle = "rgba(5, 10, 5, 0.98)"; 
             x.fillRect(0, 0, w, h);
 
-            // --- 起動特效邏輯 ---
-            let opacity = 1;
-            // 在 2.5s 到 3.2s 之間進行隨機點滅
-            if (time > 2.5 && time < 3.2) {
-                // 利用 Math.random 模擬不穩定電流
-                opacity = Math.random() > 0.4 ? 1 : 0.1; 
+            let intensity = 0;
+            if (time >= 2.5 && time < 3.5) {
+                intensity = Math.random() > 0.5 ? 1 : 0.2; 
+            } else if (time >= 3.5) {
+                intensity = 0.95 + Math.random() * 0.05; 
             }
 
-            x.globalAlpha = opacity;
-            x.fillStyle = color;
-            x.font = `bold ${h * 0.18}px sans-serif`;
-            x.textAlign = "center";
-            x.textBaseline = "middle";
-            x.shadowColor = color;
-            x.shadowBlur = opacity > 0.5 ? 25 : 5; // 點亮時才有強發光
-            x.fillText(text, w / 2, h * 0.46);
-            
+            if (intensity > 0 && text) {
+                x.globalAlpha = intensity;
+                x.fillStyle = color;
+                x.font = `bold ${h * 0.18}px sans-serif`;
+                x.textAlign = "center";
+                x.textBaseline = "middle";
+                x.shadowColor = color;
+                x.shadowBlur = 20 * intensity;
+                x.fillText(text, w / 2, h * 0.46);
+            }
             return cvs;
         },
-        isGreen: (r, g, b) => (g > 50 && g > r * 1.3 && g > b * 1.1)
+        isBillboardGreen: (r, g, b) => (g > 45 && g > r * 1.25 && g > b * 1.05)
     };
 })();
 
@@ -75,35 +80,57 @@ const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
 const runBtn = document.getElementById('runBtn');
 
-function render() {
+// 載入右下角圖片
+const cornerImg = new Image();
+cornerImg.src = 'IMG_6604.png';
+
+function process() {
     if (video.paused || video.ended) return;
 
+    // 1. 繪製原始影片幀
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    if (video.currentTime > 2.5 && document.getElementById('signText').value) {
+    const signInput = document.getElementById('signText').value;
+    
+    // 2. 處理綠色招牌文字合成
+    if (signInput) {
         const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pixels = frame.data;
         
-        // 每一影格即時生成包含點滅狀態的貼圖 (確保流暢)
-        const currentOverlay = FlipBoardModule.generateDynamicTexture(
-            document.getElementById('signText').value, 
-            canvas.width, canvas.height, 
-            document.getElementById('textColor').value,
-            video.currentTime
+        const neonTexture = FlipBoardModule.getNeonFrame(
+            signInput, canvas.width, canvas.height, 
+            document.getElementById('textColor').value, video.currentTime
         );
-        const texData = currentOverlay.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        const texPixels = neonTexture.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
         for (let i = 0; i < pixels.length; i += 4) {
-            if (FlipBoardModule.isGreen(pixels[i], pixels[i+1], pixels[i+2])) {
-                pixels[i] = texData[i];
-                pixels[i+1] = texData[i+1];
-                pixels[i+2] = texData[i+2];
+            if (FlipBoardModule.isBillboardGreen(pixels[i], pixels[i+1], pixels[i+2])) {
+                pixels[i] = texPixels[i];
+                pixels[i+1] = texPixels[i+1];
+                pixels[i+2] = texPixels[i+2];
             }
         }
         ctx.putImageData(frame, 0, 0);
     }
+
+    // 3. 影片結束前 3 秒顯示右下角圖片
+    // 假設總長為 6 秒，則 3.0s 之後顯示
+    if (video.currentTime >= 3.0) {
+        const imgW = canvas.width * 0.2; // 圖片寬度設為畫面的 20%
+        const imgH = (cornerImg.height / cornerImg.width) * imgW;
+        const padding = 20;
+        
+        ctx.globalAlpha = 1.0;
+        ctx.drawImage(
+            cornerImg, 
+            canvas.width - imgW - padding, 
+            canvas.height - imgH - padding, 
+            imgW, 
+            imgH
+        );
+    }
     
-    requestAnimationFrame(render);
+    requestAnimationFrame(process);
 }
 
 runBtn.addEventListener('click', () => {
@@ -111,7 +138,7 @@ runBtn.addEventListener('click', () => {
     canvas.height = video.videoHeight || 720;
     video.currentTime = 0;
     video.play();
-    render();
+    process();
 });
 </script>
 </body>
