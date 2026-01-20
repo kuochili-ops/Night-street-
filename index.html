@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Boundary Lock Sync</title>
+    <title>NightST - Top Edge Lock</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Boundary Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Top Edge Lock</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,27 +27,29 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">執行邊界同步</button>
+        <button class="btn" id="runBtn">執行頂部鎖定同步</button>
     </div>
 </div>
 
 <script>
 const MotionController = {
     /**
-     * 修正邏輯：
-     * 1. 終點位置大幅上移：從 44% 上調至 22%，確保第一行不超過綠板上緣。
-     * 2. 起始位置：保持在 -10% 左右，確保第二行先露臉。
-     * 3. 速度匹配：因為距離變短，時間維持 3.2s 會變得很慢，達成您的要求。
+     * 修正細節：
+     * 1. 終點位置再往上提：從 22% 提到 15%。
+     * 這會讓文字中心停在更高的地方，確保第一行字的上緣卡在招牌頂端。
+     * 2. 起始位置維持在 -8%，保證招牌底邊剛進來時，第二行字底部先出現。
+     * 3. 同步時間：維持 3.2s，因為距離極短，文字會移動得非常緩慢，跟畫面完全貼合。
      */
     getY: (h, time) => {
-        const startY = h * -0.10;
-        const endY = h * 0.22; // 停止點大幅提前，鎖定在招牌上半部
+        const startY = h * -0.08; 
+        const endY = h * 0.15; 
         
         if (time < 1.1) return startY;
         if (time > 4.3) return endY;
 
         const progress = (time - 1.1) / 3.2; 
-        const eased = 1 - Math.pow(1 - progress, 3); 
+        // 使用線性度更高的曲線，防止末端突然加速
+        const eased = 1 - Math.pow(1 - progress, 2); 
         return startY + (endY - startY) * eased;
     }
 };
@@ -70,9 +72,10 @@ function render() {
         ctx.save();
         const yOffset = MotionController.getY(h, video.currentTime);
         
+        // 點滅動畫
         let intensity = 1;
         if (video.currentTime > 2.8 && video.currentTime < 4.2) {
-            intensity = Math.random() > 0.4 ? 1 : 0.1;
+            intensity = Math.random() > 0.45 ? 1 : 0.15;
         }
 
         ctx.globalAlpha = intensity;
@@ -87,12 +90,11 @@ function render() {
         ctx.shadowColor = textColor;
         ctx.shadowBlur = 25 * intensity;
 
-        const lineHeight = fontSize * 1.35;
-        // 計算總高度，確保 yOffset 是文字中心
+        const lineHeight = fontSize * 1.3;
         const startY = yOffset; 
 
         lines.forEach((line, index) => {
-            // 繪製兩行字
+            // 繪製文字，yOffset 為兩行字的中間點
             ctx.fillText(line, w / 2, startY + (index * lineHeight));
         });
 
