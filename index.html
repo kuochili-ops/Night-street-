@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Precise Masking</title>
+    <title>NightST - Spatial Text Alignment</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,46 +18,61 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Selective Composite</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Spatial Precision</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <input type="text" id="signText" placeholder="輸入橫向招牌文字..." style="grid-column: span 2;">
+        <input type="text" id="signText" placeholder="輸入招牌文字..." style="grid-column: span 2;">
         <input type="color" id="textColor" value="#00ff88">
-        <button class="btn" id="runBtn">執行精準合成</button>
+        <button class="btn" id="runBtn">執行空間定位預覽</button>
     </div>
 </div>
 
 <script>
 const FlipBoardModule = (() => {
     return {
+        // 修正：文字現在繪製於固定的畫布座標，模擬預先定位在看板上
         getNeonFrame: (text, w, h, color, time) => {
             const cvs = document.createElement('canvas');
             cvs.width = w; cvs.height = h;
             const x = cvs.getContext('2d');
-            x.fillStyle = "rgba(5, 10, 5, 0.98)"; 
+            
+            // 招牌背板色
+            x.fillStyle = "rgba(5, 12, 5, 0.98)";
             x.fillRect(0, 0, w, h);
 
             let intensity = 0;
-            // 2.5s 後啟動文字電力
+            // 2.5s 開始啟動點滅特效
             if (time >= 2.5 && time < 3.5) {
-                intensity = Math.random() > 0.5 ? 1 : 0.2; 
+                intensity = Math.random() > 0.5 ? 1 : 0.2;
             } else if (time >= 3.5) {
-                intensity = 1; 
+                intensity = 1;
             }
 
-            if (intensity > 0 && text) {
+            if (text) {
                 x.globalAlpha = intensity;
                 x.fillStyle = color;
-                x.font = `bold ${h * 0.18}px sans-serif`;
                 x.textAlign = "center";
                 x.textBaseline = "middle";
                 x.shadowColor = color;
+                
+                // 根據字數調整大小與分行
+                let lines = text.length <= 6 ? [text] : [text.substring(0, Math.ceil(text.length/2)), text.substring(Math.ceil(text.length/2))];
+                let fontSize = text.length <= 6 ? h * 0.18 : h * 0.12;
+                
+                x.font = `bold ${fontSize}px sans-serif`;
                 x.shadowBlur = 25 * intensity;
-                x.fillText(text, w / 2, h * 0.46);
+
+                const lineHeight = fontSize * 1.2;
+                // 關鍵：固定繪製在 h * 0.46 的位置（這是 NightST 影片中看板最終穩定的中心高度）
+                const startY = (h * 0.46) - ((lines.length - 1) * lineHeight / 2);
+
+                lines.forEach((line, index) => {
+                    x.fillText(line, w / 2, startY + (index * lineHeight));
+                });
             }
             return cvs;
         },
@@ -74,6 +89,7 @@ cornerImg.src = 'IMG_6604.png';
 function process() {
     if (video.paused || video.ended) return;
 
+    // 先畫出底層影片
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const signInput = document.getElementById('signText').value;
 
@@ -81,31 +97,30 @@ function process() {
         const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pixels = frame.data;
         
+        // 取得預先畫好、位置固定的文字貼圖
         const neonTexture = FlipBoardModule.getNeonFrame(
             signInput, canvas.width, canvas.height, 
             document.getElementById('textColor').value, video.currentTime
         );
         const texPixels = neonTexture.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 核心優化：限制掃描區域
-        // NightST 的橫向大看板只會出現在畫面的上半部分（0 ~ 60% 高度）
-        // 且在影片一開始時，我們會完全跳過像素替換
-        if (video.currentTime > 2.0) { 
-            for (let y = 0; y < canvas.height * 0.6; y++) { // 只掃描畫面上半部 60%
-                for (let x = 0; x < canvas.width; x++) {
-                    const i = (y * canvas.width + x) * 4;
-                    if (FlipBoardModule.isBillboardGreen(pixels[i], pixels[i+1], pixels[i+2])) {
-                        pixels[i] = texPixels[i];
-                        pixels[i+1] = texPixels[i+1];
-                        pixels[i+2] = texPixels[i+2];
-                    }
+        // 核心邏輯：從第 0 秒就開始掃描綠色區域
+        // 由於文字在貼圖層的位置是「固定」的，而影片中的「綠色區域」是由上往下移入畫面的
+        // 所以當綠色區域只露出一半時，它只會「刷出」對應位置的文字下半部
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const i = (y * canvas.width + x) * 4;
+                if (FlipBoardModule.isBillboardGreen(pixels[i], pixels[i+1], pixels[i+2])) {
+                    // 只有在影片綠色像素出現的地方，才顯示貼圖層的內容
+                    pixels[i] = texPixels[i];
+                    pixels[i+1] = texPixels[i+1];
+                    pixels[i+2] = texPixels[i+2];
                 }
             }
-            ctx.putImageData(frame, 0, 0);
         }
+        ctx.putImageData(frame, 0, 0);
     }
 
-    // 右下角圖片
     if (video.currentTime >= 3.0) {
         const imgW = canvas.width * 0.22;
         const imgH = (cornerImg.height / cornerImg.width) * imgW;
