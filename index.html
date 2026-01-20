@@ -1,5 +1,151 @@
 <!DOCTYPE html>
+<html <!DOCTYPE html>
 <html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>NightST - High Definition Sync</title>
+    <style>
+        :root { --accent: #00ff88; --bg: #050505; }
+        body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { max-width: 850px; width: 100%; background: #151515; padding: 25px; border-radius: 15px; }
+        .view-port { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid #222; margin-bottom: 20px; }
+        canvas, video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #mainVideo { display: none; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; }
+        .btn { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; grid-column: span 2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - HD Clear Sync</h2>
+    <div class="view-port">
+        <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
+        <canvas id="compCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
+        <input type="color" id="textColor" value="#ff33cc">
+        <button class="btn" id="runBtn">執行高清同步</button>
+    </div>
+</div>
+
+<script>
+/**
+ * FlipBoard 模組 - 專注於高清文字路徑
+ */
+const FlipBoardModule = (() => {
+    return {
+        // 更新位移座標邏輯
+        getYOffset: (h, time) => {
+            if (time < 1.1) return h * -0.15;
+            if (time > 3.9) return h * 0.44;
+            // 極慢速等速同步：1.1s -> 3.9s
+            const progress = (time - 1.1) / 2.8;
+            const eased = 1 - Math.pow(1 - progress, 3);
+            return (h * -0.15) + (h * 0.59 * eased);
+        },
+        drawText: (ctx, text, w, h, color, yOffset, intensity) => {
+            ctx.save();
+            ctx.globalAlpha = intensity;
+            ctx.fillStyle = color;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            let lines = text.length > 6 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
+            let fontSize = text.length > 6 ? h * 0.11 : h * 0.16;
+            ctx.font = `900 ${fontSize}px sans-serif`;
+            
+            // 強化霓虹發光感，不使用 ImageData 避免模糊
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
+
+            const lineHeight = fontSize * 1.35;
+            const startY = yOffset - ((lines.length - 1) * lineHeight / 2);
+            lines.forEach((line, index) => {
+                ctx.fillText(line, w / 2, startY + (index * lineHeight));
+            });
+            ctx.restore();
+        }
+    };
+})();
+
+const video = document.getElementById('mainVideo');
+const canvas = document.getElementById('compCanvas');
+const ctx = canvas.getContext('2d');
+
+// 建立一個離屏畫布來製作遮罩，確保文字邊緣銳利
+const maskCanvas = document.createElement('canvas');
+const maskCtx = maskCanvas.getContext('2d');
+
+function render() {
+    if (video.paused || video.ended) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // 1. 先畫原始影片
+    ctx.drawImage(video, 0, 0, w, h);
+
+    const signInput = document.getElementById('signText').value;
+    if (signInput && video.currentTime > 1.1) {
+        // 2. 在離屏畫布製作「綠色區域」的遮罩
+        maskCanvas.width = w; maskCanvas.height = h;
+        const frame = ctx.getImageData(0, 0, w, h);
+        const data = frame.data;
+        
+        // 快速過濾出綠色招牌區域
+        for (let i = 0; i < data.length; i += 4) {
+            const y = Math.floor((i / 4) / w);
+            const isGreen = (y < h * 0.58) && (data[i+1] > 45 && data[i+1] > data[i] * 1.25);
+            // 將綠色區塊變為純黑，其他變為全透明，作為遮罩
+            data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+            data[i+3] = isGreen ? 255 : 0;
+        }
+        maskCtx.putImageData(frame, 0, 0);
+
+        // 3. 混合模式處理
+        const yOffset = FlipBoardModule.getYOffset(h, video.currentTime);
+        let intensity = (video.currentTime >= 2.8 && video.currentTime < 3.8) ? (Math.random() > 0.5 ? 1 : 0.2) : 1;
+
+        // 將畫布限制在遮罩內繪製文字
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-in'; 
+        // 這一步會讓接下來畫的東西只出現在剛剛偵測到的綠色招牌區
+        // 但為了反向操作，我們先畫文字，再用遮罩切
+        ctx.restore();
+
+        // 正確做法：先在臨時畫布畫文字，再把文字切碎貼回來
+        const tempCvs = document.createElement('canvas');
+        tempCvs.width = w; tempCvs.height = h;
+        const tempCtx = tempCvs.getContext('2d');
+        
+        FlipBoardModule.drawText(tempCtx, signInput, w, h, document.getElementById('textColor').value, yOffset, intensity);
+        
+        // 用遮罩切除文字多餘部分
+        tempCtx.globalCompositeOperation = 'destination-in';
+        tempCtx.drawImage(maskCanvas, 0, 0);
+        
+        // 貼回主畫布
+        ctx.drawImage(tempCvs, 0, 0);
+    }
+    
+    requestAnimationFrame(render);
+}
+
+document.getElementById('runBtn').addEventListener('click', () => {
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    video.currentTime = 0;
+    video.play();
+    render();
+});
+</script>
+</body>
+</html>
+="zh-TW">
 <head>
     <meta charset="UTF-8">
     <title>NightST - Transparent Glue Sync</title>
