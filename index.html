@@ -2,47 +2,50 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 初始高度與圖片整合</title>
+    <title>NightST - 高品質錄製與分享版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; }
+        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; border-radius: 8px; }
         canvas, video { position: absolute; width: 100%; height: 100%; }
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
-        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; }
-        button { padding: 15px; background: var(--accent); color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
+        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 15px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
+        #runBtn { background: #444; color: #fff; }
+        #shareBtn { background: var(--accent); color: #000; }
+        button:active { opacity: 0.7; }
     </style>
 </head>
 <body>
 
 <div class="view-port">
-    <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
+    <video id="mainVideo" src="NightST.MP4" playsinline muted></video>
     <canvas id="compCanvas"></canvas>
 </div>
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
-    <button id="runBtn">啟動高度與圖片測試</button>
+    <div class="btn-group">
+        <button id="runBtn">僅啟動預覽</button>
+        <button id="shareBtn">錄製並分享影片 🎬</button>
+    </div>
 </div>
 
 <script>
-// 🖼️ 預載右下角圖片
-const cornerImg = new Image();
-cornerImg.src = 'IMG_6604.png'; 
-
+/**
+ * [FlipBoardModule] 處理文字動態軌跡
+ * 優化點：startY 收斂至 -0.20，結束時間提前至 4.0s 以增加穩定性
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：調整至 -0.25，讓出現位置更高
-            const startY = h * -0.25; 
-            // 📍 終點：維持在 0.28，避開燈管
+            const startY = h * -0.20; 
             const endY = h * 0.28; 
-            
             if (time < 1.4) return startY;
-            if (time > 5.0) return endY; 
-
-            const progress = (time - 1.4) / 3.6; 
+            if (time > 4.0) return endY; 
+            const progress = (time - 1.4) / 2.6; 
             return startY + (endY - startY) * progress;
         }
     };
@@ -51,6 +54,15 @@ const FlipBoardModule = (() => {
 const video = document.getElementById('mainVideo');
 const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
+const signInput = document.getElementById('signText');
+
+// 🖼️ 預載資源
+const cornerImg = new Image();
+cornerImg.src = 'IMG_6604.png'; 
+
+// 🎥 錄製相關變數
+let mediaRecorder;
+let recordedChunks = [];
 
 function render() {
     if (video.paused || video.ended) return;
@@ -59,9 +71,9 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     
     const time = video.currentTime;
-    const signText = document.getElementById('signText').value;
+    const signText = signInput.value;
 
-    // 🟢 繪製綠板文字 (1.4s 開始)
+    // 🟢 繪製綠板文字
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
@@ -73,9 +85,7 @@ function render() {
         ctx.shadowColor = "#00ff88";
         ctx.shadowBlur = 20;
 
-        const lines = signText.length > 7 ? 
-            [signText.slice(0, 7), signText.slice(7)] : [signText];
-            
+        const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.2; 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
@@ -83,10 +93,10 @@ function render() {
         ctx.restore();
     }
 
-    // 🖼️ 繪製右下角圖片 (3.0s 開始)
+    // 🖼️ 繪製右下角圖片 (3.0s 出現)
     if (time >= 3.0) {
         ctx.save();
-        const imgW = w * 0.25; // 寬度設為畫面的 25%
+        const imgW = w * 0.25;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
         const padding = 20;
         ctx.drawImage(cornerImg, w - imgW - padding, h - imgH - padding, imgW, imgH);
@@ -96,13 +106,59 @@ function render() {
     requestAnimationFrame(render);
 }
 
-document.getElementById('runBtn').addEventListener('click', () => {
+// 📤 分享邏輯
+async function exportAndShare() {
+    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+            await navigator.share({ files: [file], title: 'NightST 影片分享' });
+        } catch (err) { console.log("分享取消"); }
+    } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'NightST_Export.mp4'; a.click();
+    }
+}
+
+// 🎬 自動化錄製監控
+video.onended = () => {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+    }
+};
+
+// 🔘 按鈕事件
+document.getElementById('runBtn').onclick = () => {
+    initCanvas();
+    video.play();
+    render();
+};
+
+document.getElementById('shareBtn').onclick = () => {
+    initCanvas();
+    recordedChunks = [];
+    
+    // 🎥 設定 30fps 高品質錄製
+    const stream = canvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm; codecs=vp9',
+        videoBitsPerSecond: 10000000 
+    });
+    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+    mediaRecorder.onstop = exportAndShare;
+    
+    mediaRecorder.start();
+    video.play();
+    render();
+};
+
+function initCanvas() {
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     video.currentTime = 0;
-    video.play();
-    render();
-});
+}
 </script>
 </body>
 </html>
