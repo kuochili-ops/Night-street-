@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Precise Boundary Entry</title>
+    <title>NightST - Layered Text Sync</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,20 +18,23 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Boundary Entry</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Precise Layer Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <input type="text" id="signText" value="這是第二次測試" placeholder="請輸入文字..." style="grid-column: span 2;">
+        <input type="text" id="signText" value="第一行&#10;第二行&#10;第三行" placeholder="輸入文字 (支援多行)..." style="grid-column: span 2; height: 60px;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">啟動座標同步合成</button>
+        <button class="btn" id="runBtn">執行三行同步合成</button>
     </div>
 </div>
 
 <script>
+/**
+ * FlipBoard 模組：處理三行文字的空間鎖定與同步位移
+ */
 const FlipBoardModule = (() => {
     return {
         getSyncedTexture: (text, w, h, color, time) => {
@@ -42,37 +45,36 @@ const FlipBoardModule = (() => {
             x.fillStyle = "rgba(5, 8, 5, 0.98)";
             x.fillRect(0, 0, w, h);
 
-            /**
-             * 修正後的座標軌跡：
-             * 看板在 0.62s 從頂部切入。
-             * 為了讓文字「跟著看板降落」，我們計算文字區塊的總高度。
-             */
-            let lines = text.length > 6 ? [text.slice(0, Math.ceil(text.length/2)), text.slice(Math.ceil(text.length/2))] : [text];
-            let fontSize = text.length > 6 ? h * 0.12 : h * 0.18;
+            // 解析多行文字（支援 \n 或換行符號）
+            const lines = text.split('\n').filter(l => l.trim() !== "");
+            const fontSize = h * (lines.length > 2 ? 0.09 : 0.15); // 三行時縮小字體
             const lineHeight = fontSize * 1.3;
-            const totalTextHeight = lines.length * lineHeight;
+            const totalHeight = lines.length * lineHeight;
 
-            let yPos; // 文字中心點的 Y 座標
+            /**
+             * 物理軌跡計算：
+             * 0.62s 時，文字區塊的「底部」位於 y = 0 (不可見)
+             * 2.10s 時，文字區塊的「中心」位於看板中心 y = 0.44h
+             */
+            let centerY;
             const startTime = 0.62;
-            const targetTime = 2.1; 
-            const targetY = h * 0.44; // 最終中心位置
+            const targetTime = 2.1;
+            const finalCenterY = h * 0.44; 
+            const initialCenterY = -(totalHeight / 2); // 中心點在上方，底邊切齊 0
 
             if (time < startTime) {
-                // 初始位置：中心點在畫布上方，且底部剛好碰到 y=0
-                // yPos = -(文字半高) 確保底邊切齊 0
-                yPos = -(totalTextHeight / 2); 
+                centerY = initialCenterY;
             } else if (time < targetTime) {
                 const progress = (time - startTime) / (targetTime - startTime);
-                const startY = -(totalTextHeight / 2);
-                yPos = startY + (targetY - startY) * progress;
+                centerY = initialCenterY + (finalCenterY - initialCenterY) * progress;
             } else {
-                yPos = targetY;
+                centerY = finalCenterY;
             }
 
-            // 閃爍特效
-            let intensity = (time >= 2.5 && time < 3.4) ? (Math.random() > 0.4 ? 1 : 0.1) : 1;
+            // 閃爍特效 (2.5s 開始)
+            const intensity = (time >= 2.5 && time < 3.4) ? (Math.random() > 0.4 ? 1 : 0.1) : 1;
 
-            if (text) {
+            if (lines.length > 0) {
                 x.globalAlpha = intensity;
                 x.fillStyle = color;
                 x.textAlign = "center";
@@ -81,16 +83,16 @@ const FlipBoardModule = (() => {
                 x.shadowColor = color;
                 x.shadowBlur = 20;
 
-                const drawStartY = yPos - ((lines.length - 1) * lineHeight / 2);
+                const startDrawY = centerY - ((lines.length - 1) * lineHeight / 2);
                 lines.forEach((line, index) => {
-                    x.fillText(line, w / 2, drawStartY + (index * lineHeight));
+                    x.fillText(line, w / 2, startDrawY + (index * lineHeight));
                 });
             }
             return cvs;
         },
+        // 偵測綠色並保護下方招牌
         isTargetGreen: (r, g, b, y, canvasH) => {
-            // 嚴格過濾：只針對畫面上半部，保護下方直式招牌
-            return (y < canvasH * 0.55) && (g > 45 && g > r * 1.3 && g > b * 1.1);
+            return (y < canvasH * 0.58) && (g > 45 && g > r * 1.3 && g > b * 1.1); //
         }
     };
 })();
@@ -117,7 +119,7 @@ function render() {
         );
         const texPixels = textLayer.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
 
-        // 僅在 0.62 秒看板露頭後啟動，並保護下方的直式招牌
+        // 在看板露頭後啟動，並保護下方的直式招牌
         if (video.currentTime > 0.6) {
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
