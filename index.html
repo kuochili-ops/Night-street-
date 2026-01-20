@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Physics Sync Lock</title>
+    <title>NightST - Final Physical Lock</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="container">
-    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Physics Sync</h2>
+    <h2 style="margin:0 0 15px 0; color:var(--accent);">NightST - Physical Lock Sync</h2>
     <div class="view-port">
         <video id="mainVideo" src="NightST.MP4" playsinline muted loop></video>
         <canvas id="compCanvas"></canvas>
@@ -27,27 +27,26 @@
     <div class="controls">
         <input type="text" id="signText" value="這是第二次測試" style="grid-column: span 2;">
         <input type="color" id="textColor" value="#ff33cc">
-        <button class="btn" id="runBtn">啟動物理同步</button>
+        <button class="btn" id="runBtn">啟動物理同步合成</button>
     </div>
 </div>
 
 <script>
+/**
+ * FlipBoardModule - 處理物理同步位移
+ * 封裝了我們剛才微調的所有邏輯
+ */
 const FlipBoardModule = (() => {
     return {
-        /**
-         * 修正邏輯：
-         * 1. 縮小位移範圍：從 -0.05 到 0.08。距離極短，文字會下降得非常緩慢。
-         * 2. 停穩時間 3.5s：確保在運鏡停止前，文字就已經到達定點。
-         */
+        // 核心對位參數
         getY: (h, time) => {
-            const startY = h * -0.05; 
-            const endY = h * 0.08; 
+            const startY = h * -0.05; //
+            const endY = h * 0.11;    //
             
             if (time < 1.1) return startY;
-            if (time > 3.5) return endY; 
+            if (time > 3.5) return endY; //
 
             const progress = (time - 1.1) / 2.4; 
-            // 改用線性位移，消除任何加速導致的「衝過頭」感
             return startY + (endY - startY) * progress;
         }
     };
@@ -71,6 +70,7 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
         
+        // 霓虹閃爍邏輯
         let intensity = 1;
         if (video.currentTime > 3.0 && video.currentTime < 4.2) {
             intensity = Math.random() > 0.4 ? 1 : 0.15;
@@ -79,18 +79,19 @@ function render() {
         ctx.globalAlpha = intensity;
         ctx.fillStyle = textColor;
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.textBaseline = "top"; // 以第一行上緣為基準
         
         const fontSize = h * 0.14; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = textColor;
         ctx.shadowBlur = 25 * intensity;
 
+        // 文字分行處理
         const lines = signText.length > 6 ? 
             [signText.slice(0, Math.ceil(signText.length/2)), signText.slice(Math.ceil(signText.length/2))] : 
             [signText];
             
-        const lineHeight = fontSize * 1.3;
+        const lineHeight = fontSize * 1.1; // 緊湊行高
 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
