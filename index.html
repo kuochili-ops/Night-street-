@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 初始高位鎖定</title>
+    <title>NightST - 初始高度精調</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -23,19 +23,19 @@
 
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清">
-    <button id="runBtn">啟動起始高位測試</button>
+    <button id="runBtn">啟動高度平衡測試</button>
 </div>
 
 <script>
 /**
- * FlipBoardModule - 初始位置拉高校準
+ * FlipBoardModule - 初始高度與最終位置平衡
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起點：拉高到 -0.45，讓文字從更高處切入
-            const startY = h * -0.45; 
-            // 📍 終點：維持在 0.28，避開燈管
+            // 🚩 起點：調低至 -0.15，縮短起始與終點的落差
+            const startY = h * -0.15; 
+            // 📍 終點：維持在 0.28，確保不遮擋燈管
             const endY = h * 0.28; 
             
             // ⏱️ 時間鎖定：1.4s ~ 5.0s
@@ -59,6 +59,7 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     const signText = document.getElementById('signText').value;
 
+    // 1.4s 同步出現
     if (signText && video.currentTime > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, video.currentTime);
