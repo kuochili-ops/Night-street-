@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 視覺同步與選色版</title>
+    <title>NightST - 視覺錨點修正版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -13,7 +13,7 @@
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; }
         input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
-        input[type="color"] { width: 50px; height: 50px; border: none; background: none; cursor: pointer; }
+        input[type="color"] { width: 50px; height: 52px; border: 1px solid #333; background: #1a1a1a; cursor: pointer; border-radius: 8px; padding: 2px; }
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
@@ -42,22 +42,32 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 修正相對位移：在 3.2s 畫面穩定前，文字固定在燈管下方 (startY)
+ * 核心修正：加入動態座標補償 (Motion Compensation)
+ * 模擬文字「貼」在向上攀爬的畫面中
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.18; // 🚩 固定在燈管下的起始高度
-            const endY = h * 0.30;   // 📍 綠板中央偏下的終點
-            
-            // 🛑 1.4s 到 3.2s 絕對定格，這段時間畫面正在向上攀升
-            if (time < 3.2) return startY; 
-            if (time >= 5.0) return endY; 
+            // 🚩 初始位置：在燈管下方
+            const startY = h * -0.15; 
+            // 📍 終點位置：綠板中央
+            const endY = h * 0.28;   
 
-            // 3.2s 到 5.0s 畫面穩定後，才開始平滑下滑
-            const t = (time - 3.2) / 1.8; 
-            const easeOut = 1 - Math.pow(1 - t, 2); // 平滑減速停止
-            return startY + (endY - startY) * easeOut;
+            // 🛠️ 階段 1：畫面攀升期 (1.4s - 3.1s)
+            // 為了讓文字看起來「固定」在向上動的畫面上，文字的 Y 座標必須跟著變小
+            if (time < 3.1) {
+                const climbProgress = (time - 1.4) / 1.7;
+                const compensation = h * 0.12 * climbProgress; // 補償畫面攀升的距離
+                return startY - compensation; 
+            }
+
+            // 🛠️ 階段 2：畫面穩定後開始滑動 (3.1s - 5.0s)
+            const postClimbY = startY - (h * 0.12); // 攀升結束後的相對高度
+            if (time >= 5.0) return endY;
+
+            const slideT = (time - 3.1) / 1.9;
+            const easeOut = 1 - Math.pow(1 - slideT, 3); // 更有質感的滑落
+            return postClimbY + (endY - postClimbY) * easeOut;
         }
     };
 })();
@@ -93,7 +103,6 @@ function render() {
         const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         
-        // 發光顏色跟隨文字顏色
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 20;
         
@@ -120,16 +129,16 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Custom.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Final.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'My NightST Creation' });
+            await navigator.share({ files: [file], title: 'NightST 創作分享' });
         } catch (err) { console.log("Share skipped"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Custom.mp4'; a.click();
+        a.href = url; a.download = 'NightST_Final.mp4'; a.click();
     }
 }
 
@@ -148,7 +157,6 @@ document.getElementById('shareBtn').onclick = () => {
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
     const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-
     mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10000000 });
     mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
     mediaRecorder.onstop = exportAndShare;
