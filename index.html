@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 動態黏著補償版</title>
+    <title>NightST - 定點補償與輸出修復版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -33,13 +33,14 @@
 </div>
 
 <script>
+// [FlipBoardModule] 封裝位置計算與補償邏輯
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 1.1; 
             const stopTime = 2.4;  
             const startY = h * -0.2; 
-            const endY = h * 0.22;   
+            const endY = h * 0.15; // 🚩 位置上移
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -47,8 +48,8 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 🏎️ 補償背景攀升：每秒向下移動約 8.2% 畫面高度
-            const driftRate = h * 0.082; 
+            // 🏎️ 動態補償：抵消背景上移
+            const driftRate = h * 0.1; 
             return endY + (driftRate * (time - stopTime)); 
         }
     };
@@ -77,7 +78,7 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 📏 選項 A：自動縮放字體
+        // 📏 自動縮放字體
         let fontSize = h * 0.09;
         const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -109,12 +110,15 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 錄製修復邏輯
 async function exportAndShare() {
+    if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+    
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
-        catch (err) { console.log("Share canceled"); }
+        catch (err) { console.log("分享取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -123,13 +127,20 @@ async function exportAndShare() {
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
+
 document.getElementById('runBtn').onclick = () => { setup(); video.play(); render(); };
+
 document.getElementById('shareBtn').onclick = () => {
     setup();
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 10000000 });
-    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+    
+    // 選取支援的錄製格式
+    const types = ["video/mp4", "video/webm;codecs=vp9", "video/webm"];
+    const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || "";
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = exportAndShare;
     mediaRecorder.start();
     video.play();
