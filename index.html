@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致位置與分享優化版</title>
+    <title>NightST - 極致高度與錄製修正版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -29,7 +29,7 @@
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
+        <button id="runBtn">預覽效果</button>
         <button id="shareBtn">錄製並分享 🎬</button>
     </div>
 </div>
@@ -37,13 +37,13 @@
 <script>
 /**
  * [FlipBoardModule] 
- * startY 從 0.02 調整為 -0.05，讓文字起始位置更高，甚至稍微超出頂部
+ * startY 從 -0.05 再次大幅拉高至 -0.12
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.05; // 🚩 起點再拉高，藏入頂部邊緣
-            const endY = h * 0.28;   // 📍 終點位置不變
+            const startY = h * -0.12; // 🚩 極致高度：從畫面更上方滑入
+            const endY = h * 0.28;   
             if (time < 1.4) return startY;
             if (time > 4.0) return endY; 
             const progress = (time - 1.4) / 2.6; 
@@ -79,7 +79,6 @@ function render() {
         ctx.textBaseline = "top"; 
         const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
-        
         ctx.shadowColor = "#00ff88";
         ctx.shadowBlur = 18;
         
@@ -105,21 +104,24 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 📤 分享功能
 async function exportAndShare() {
-    if (recordedChunks.length === 0) return;
+    if (recordedChunks.length === 0) {
+        console.error("無錄製數據");
+        return;
+    }
     
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "MyNightScene.mp4", { type: 'video/mp4' });
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 分享' });
-        } catch (err) { console.log("Share failed or cancelled"); }
+            await navigator.share({ files: [file], title: 'NightST 作品' });
+        } catch (err) { console.warn("分享取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = 'NightST_Export.mp4'; a.click();
+        URL.revokeObjectURL(url);
     }
     recordedChunks = [];
 }
@@ -140,24 +142,31 @@ document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
     recordedChunks = [];
     
-    // 🎥 高品質錄製設定
+    // 🎥 針對 iOS 修復錄影流
     const stream = canvas.captureStream(30); 
-    let mimeType = 'video/webm;codecs=vp9';
-    if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
-
-    mediaRecorder = new MediaRecorder(stream, {
-        mimeType: mimeType,
-        videoBitsPerSecond: 10000000 
-    });
-
-    mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-    mediaRecorder.onstop = exportAndShare;
     
-    mediaRecorder.start();
-    video.play();
-    render();
+    // 自動尋找支援的格式
+    const supportedTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    let selectedType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type));
+
+    try {
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: selectedType,
+            videoBitsPerSecond: 10000000 
+        });
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = exportAndShare;
+        
+        // 🚀 設定每 1000ms 切片一次，避免數據遺失
+        mediaRecorder.start(1000); 
+        video.play();
+        render();
+    } catch (e) {
+        alert("此瀏覽器環境暫不支援高品質錄製");
+    }
 };
 
 function prepareCanvas() {
