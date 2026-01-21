@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致穩定版</title>
+    <title>NightST - 提早出現與位置鎖定版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -33,36 +33,33 @@
         <input type="color" id="textColor" value="#00ff88">
     </div>
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製分享</button>
+        <button id="runBtn">預覽效果</button>
+        <button id="shareBtn">錄製並分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：
- * 1. startY: -0.25 (極致高位)
- * 2. midY: -0.26 (0.8s-3.1s 之間近乎靜止)
+ * 1. 0.2s - 3.1s: 位置完全固定在 -0.25 (不再有上升速度)
+ * 2. 3.1s - 5.0s: 執行下滑動作
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.25; 
-            const midY = h * -0.26;   
-            const finalY = h * 0.28;  
+            const staticY = h * -0.25; // 🚩 固定起始高位
+            const finalY = h * 0.28;   // 最終位置
 
-            // 🛠️ 0.8s - 3.1s：近乎靜止階段 (速度降至最低)
+            // 🛠️ 3.1s 之前完全靜止不動
             if (time < 3.1) {
-                const progress = Math.max(0, (time - 0.8) / 2.3);
-                return startY + (midY - startY) * progress;
+                return staticY;
             }
 
-            // 🛠️ 3.1s - 5.0s：滑落進入綠板
+            // 🛠️ 3.1s 之後執行下滑速度
             if (time >= 5.0) return finalY;
             const slideProgress = (time - 3.1) / 1.9;
-            const easeOut = 1 - Math.pow(1 - slideProgress, 3);
-            return midY + (finalY - midY) * easeOut;
+            const easeOut = 1 - Math.pow(1 - slideProgress, 3); // 保持你喜歡的下滑手感
+            return staticY + (finalY - staticY) * easeOut;
         }
     };
 })();
@@ -88,7 +85,8 @@ function render() {
     const signText = signInput.value;
     const selectedColor = colorInput.value;
 
-    if (signText && time > 0.8) {
+    // 🚩 提早到 0.2s 出現
+    if (signText && time > 0.2) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         ctx.fillStyle = selectedColor;
@@ -122,7 +120,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Perfect.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Fixed_Early.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
