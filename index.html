@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 底部起步同步版</title>
+    <title>NightST - 等速進場錄製版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -36,21 +36,18 @@
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🟢 startY 設在 0.35 (底部)，endY 在 0.28 (上半部)
-            const startY = h * 0.35; 
-            const endY = h * 0.28; 
-            const startTime = 1.2; // 稍微延後一點點啟動
-            const endTime = 4.5; 
+            const startTime = 1.2;
+            const startY = h * 1.1; // 從畫面下方外開始
+            const endY = h * 0.28;  // 定位在綠板上半部
+            const duration = 2.8;   // 移動總時長
 
             if (time < startTime) return startY;
-            if (time > endTime) return endY; 
-
-            let progress = (time - startTime) / (endTime - startTime);
             
-            // 使用 Smoothstep 公式，讓字體隨畫面平滑攀升
-            const easedProgress = progress * progress * (3 - 2 * progress); 
-
-            return startY + (endY - startY) * easedProgress;
+            const elapsed = time - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // 線性等速公式
+            return startY + (endY - startY) * progress;
         }
     };
 })();
@@ -74,22 +71,27 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
 
-    if (signText && time > 1.2) {
+    // 🚩 只有在 1.2s 後才繪製文字，避免一開始就在畫面上
+    if (signText && time >= 1.2) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        ctx.fillStyle = "#00ff88"; 
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top"; 
-        const fontSize = h * 0.09; // 稍微調小字體以防溢出綠板底部
-        ctx.font = `900 ${fontSize}px sans-serif`;
-        ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 15;
+        
+        // 只有在進入畫面範圍內才實際繪圖
+        if (currentY < h + 100) {
+            ctx.fillStyle = "#00ff88"; 
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top"; 
+            const fontSize = h * 0.09;
+            ctx.font = `900 ${fontSize}px sans-serif`;
+            ctx.shadowColor = "#00ff88";
+            ctx.shadowBlur = 15;
 
-        const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
-        const lineHeight = fontSize * 1.2; 
-        lines.forEach((line, index) => {
-            ctx.fillText(line, w / 2, currentY + (index * lineHeight));
-        });
+            const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
+            const lineHeight = fontSize * 1.2; 
+            lines.forEach((line, index) => {
+                ctx.fillText(line, w / 2, currentY + (index * lineHeight));
+            });
+        }
         ctx.restore();
     }
 
@@ -102,6 +104,7 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// ... 其餘錄製與分享邏輯保持不變 ...
 async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
