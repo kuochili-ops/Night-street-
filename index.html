@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致位置優化版</title>
+    <title>NightST - 極致位置與分享優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -12,7 +12,6 @@
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
         input { padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
-        input:focus { border-color: var(--accent); }
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
@@ -31,20 +30,20 @@
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製並分享 🎬</button>
+        <button id="shareBtn">錄製並分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule]
- * startY 從 0.15 提升至 0.02，確保文字起始位置更高，更貼近綠板頂部
+ * [FlipBoardModule] 
+ * startY 從 0.02 調整為 -0.05，讓文字起始位置更高，甚至稍微超出頂部
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * 0.02; // 🚩 極致高度：貼近頂部
-            const endY = h * 0.28;   // 📍 最終停留在燈管下方
+            const startY = h * -0.05; // 🚩 起點再拉高，藏入頂部邊緣
+            const endY = h * 0.28;   // 📍 終點位置不變
             if (time < 1.4) return startY;
             if (time > 4.0) return endY; 
             const progress = (time - 1.4) / 2.6; 
@@ -79,11 +78,10 @@ function render() {
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
         const fontSize = h * 0.10; 
-        ctx.font = `900 ${fontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
+        ctx.font = `900 ${fontSize}px sans-serif`;
         
-        // 增強發光效果
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 18;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25; 
@@ -99,7 +97,7 @@ function render() {
         const imgW = w * imgScale;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
         const padding = 20;
-        ctx.globalAlpha = Math.min(1, (time - 3.0) * 2); // 增加淡入效果
+        ctx.globalAlpha = Math.min(1, (time - 3.0) * 1.5);
         ctx.drawImage(cornerImg, w - imgW - padding, h - imgH - padding, imgW, imgH);
         ctx.restore();
     }
@@ -107,24 +105,23 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 📤 分享功能
 async function exportAndShare() {
-    if (recordedChunks.length === 0) {
-        alert("錄製失敗，請重試");
-        return;
-    }
+    if (recordedChunks.length === 0) return;
     
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Art.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 創作' });
-        } catch (err) { console.log("User cancelled"); }
+            await navigator.share({ files: [file], title: 'NightST 分享' });
+        } catch (err) { console.log("Share failed or cancelled"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Art.mp4'; a.click();
+        a.href = url; a.download = 'NightST_Export.mp4'; a.click();
     }
+    recordedChunks = [];
 }
 
 video.onended = () => {
@@ -139,36 +136,28 @@ document.getElementById('runBtn').onclick = () => {
     render();
 };
 
-document.getElementById('shareBtn').onclick = async () => {
+document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
     recordedChunks = [];
     
-    // 解決 iOS 錄影相容性：確保在 User Gesture 內啟動 Stream
+    // 🎥 高品質錄製設定
     const stream = canvas.captureStream(30); 
-    let options = { videoBitsPerSecond: 12000000 };
-    
-    // 優先順序：mp4 > webm
-    const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-    for (let type of types) {
-        if (MediaRecorder.isTypeSupported(type)) {
-            options.mimeType = type;
-            break;
-        }
-    }
+    let mimeType = 'video/webm;codecs=vp9';
+    if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
 
-    try {
-        mediaRecorder = new MediaRecorder(stream, options);
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-        mediaRecorder.onstop = exportAndShare;
-        
-        mediaRecorder.start();
-        video.play();
-        render();
-    } catch (e) {
-        alert("錄製啟動失敗: " + e.message);
-    }
+    mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 10000000 
+    });
+
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    mediaRecorder.onstop = exportAndShare;
+    
+    mediaRecorder.start();
+    video.play();
+    render();
 };
 
 function prepareCanvas() {
