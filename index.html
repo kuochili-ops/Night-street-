@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 均速減緩版</title>
+    <title>NightST - 提早出現版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,18 +41,18 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：直接減慢 1.4s 到 3.1s 的移動速度
+ * 核心調整：文字提早至 0.8s 出現
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.05; // 出現位置
-            const midY = h * -0.12;   // 🚀 關鍵：減小 3.1s 時的高度，讓上升變慢
+            const startY = h * -0.02; // 出現位置稍微下修，讓提早出現時就能看到字
+            const midY = h * -0.10;   // 3.1s 時的高度 (緩慢上升)
             const finalY = h * 0.28;  // 最終位置
 
-            // 🛠️ 1.4s - 3.1s：攀升階段 (大幅減速)
+            // 🛠️ 0.8s - 3.1s：攀升階段 (提早出現並保持慢速)
             if (time < 3.1) {
-                const progress = (time - 1.4) / 1.7;
+                const progress = Math.max(0, (time - 0.8) / 2.3);
                 return startY + (midY - startY) * progress;
             }
 
@@ -86,7 +86,8 @@ function render() {
     const signText = signInput.value;
     const selectedColor = colorInput.value;
 
-    if (signText && time > 1.4) {
+    // 🚩 文字改在 0.8s 出現
+    if (signText && time > 0.8) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         ctx.fillStyle = selectedColor;
@@ -116,17 +117,16 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製與分享
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Slow.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Early.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST.mp4'; a.click();
+        a.href = url; a.download = 'NightST_Early.mp4'; a.click();
     }
 }
 
