@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 完美起始高度版</title>
+    <title>NightST - 四點座標追蹤版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -18,7 +18,7 @@
         button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
         #shareBtn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(0, 255, 136, 0.3); }
-        button:active { transform: scale(0.98); opacity: 0.8; }
+        .hint { font-size: 12px; color: #888; text-align: center; }
     </style>
 </head>
 <body>
@@ -34,37 +34,48 @@
         <input type="color" id="textColor" value="#00ff88">
     </div>
     <div class="btn-group">
-        <button id="runBtn">預覽效果</button>
-        <button id="shareBtn">錄製並分享 🎬</button>
+        <button id="runBtn">預覽</button>
+        <button id="shareBtn">錄製分享</button>
     </div>
+    <p class="hint">提示：文字現在會根據預設座標點隨鏡頭同步位移</p>
 </div>
 
 <script>
 /**
- * [FlipBoardModule]
- * anchorY 從 -0.10 拉高至 -0.16
+ * [FlipBoardModule] - 平面追蹤模擬
+ * 我們定義不同時間點綠板「中心點」的 Y 座標百分比 (0~1)
  */
 const FlipBoardModule = (() => {
+    // 關鍵幀數據 (時間: 秒, 畫面上緣對齊點: Y百分比)
+    const keyframes = [
+        { time: 1.4, y: -0.16 }, // 出現時在上方燈管
+        { time: 2.5, y: -0.35 }, // 畫面攀升最高點 (抵消位移)
+        { time: 3.2, y: -0.05 }, // 畫面回穩
+        { time: 5.0, y: 0.28 }   // 最終滑落至綠板中央
+    ];
+
     return {
         getY: (h, time) => {
-            // 🚩 起始點再次拉高：定位在燈管上半部
-            const anchorY = h * -0.16; 
-            const finalY = h * 0.28;   
-
-            // 🛠️ 階段 1：畫面劇烈攀升期 (1.4s - 3.1s)
-            if (time < 3.1) {
-                const climbFactor = (time - 1.4) / 1.7;
-                // 同步調高補償值 (0.20)，維持吸附感
-                return anchorY - (h * 0.20 * climbFactor);
+            // 找到當前時間落在哪兩個關鍵幀之間
+            let i = 0;
+            while (i < keyframes.length - 2 && time > keyframes[i+1].time) {
+                i++;
             }
+            
+            const start = keyframes[i];
+            const end = keyframes[i+1];
+            
+            if (time < start.time) return start.y * h;
+            if (time > end.time) return end.y * h;
 
-            // 🛠️ 階段 2：滑落期 (3.1s - 5.0s)
-            const postClimbY = anchorY - (h * 0.20); 
-            if (time >= 5.0) return finalY;
-
-            const slideT = (time - 3.1) / 1.9;
-            const easeOut = 1 - Math.pow(1 - slideT, 3); 
-            return postClimbY + (finalY - postClimbY) * easeOut;
+            // 線性插值計算當前位置
+            const t = (time - start.time) / (end.time - start.time);
+            
+            // 如果是最後一段滑落，使用平滑曲線，其餘段落使用線性追蹤
+            const ease = (i === keyframes.length - 2) ? (1 - Math.pow(1 - t, 3)) : t;
+            
+            const interpolatedY = start.y + (end.y - start.y) * ease;
+            return interpolatedY * h;
         }
     };
 })();
@@ -123,16 +134,17 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 分享與錄影邏輯維持不變
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Art.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Tracked.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST 創作' }); } catch (err) {}
+        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Art.mp4'; a.click();
+        a.href = url; a.download = 'NightST.mp4'; a.click();
     }
 }
 
@@ -142,8 +154,7 @@ document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
     recordedChunks = [];
     const stream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10000000 });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4', videoBitsPerSecond: 10000000 });
     mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
     mediaRecorder.onstop = exportAndShare;
     mediaRecorder.start(100);
