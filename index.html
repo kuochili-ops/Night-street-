@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 降低起始位版</title>
+    <title>NightST - 慢速進入版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -34,30 +34,34 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽效果</button>
-        <button id="shareBtn">錄製並分享 🎬</button>
+        <button id="shareBtn">錄製分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 1. 0.0s - 3.1s: 位置鎖定在 -0.10 (稍微降低，讓它早點進入視野)
- * 2. 3.1s - 5.0s: 向下滑動
+ * 核心調整：讓文字從 -0.15 (畫面外) 慢慢移動到 0.05 (畫面內頂部)
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const staticY = h * -0.10; // 🚩 下修起始位置，從 -0.25 降到 -0.10
-            const finalY = h * 0.28;   
+            const entryStart = h * -0.15; // 🚩 一開始在畫面外上方
+            const entryEnd = h * 0.05;    // 🚩 3.1s 時移動到的位置 (剛進入畫面)
+            const finalY = h * 0.28;      // 🚩 5.0s 最終綠板中央
 
+            // 🛠️ 階段一：0.0s - 3.1s (文字慢慢進入畫面)
             if (time < 3.1) {
-                return staticY;
+                const progress = time / 3.1;
+                // 使用線性移動讓速度保持穩定
+                return entryStart + (entryEnd - entryStart) * progress;
             }
 
+            // 🛠️ 階段二：3.1s - 5.0s (從頂部下滑到綠板)
             if (time >= 5.0) return finalY;
             const slideProgress = (time - 3.1) / 1.9;
             const easeOut = 1 - Math.pow(1 - slideProgress, 3); 
-            return staticY + (finalY - staticY) * easeOut;
+            return entryEnd + (finalY - entryEnd) * easeOut;
         }
     };
 })();
@@ -117,7 +121,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Adjusted.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_SlowEntry.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
