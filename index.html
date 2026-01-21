@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 平滑動態優化版</title>
+    <title>NightST - 終點下調與平滑動態版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -37,22 +37,18 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 修正「先下再上」的問題：使用平滑緩動 (Ease-Out)
+ * 終點位置 (endY) 調降至 0.33
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startY = h * -0.25; 
-            const endY = h * 0.28;   
+            const endY = h * 0.33;   // 🚀 終點位置下調，讓文字更靠近綠板底部
             
             if (time < 1.4) return startY;
-            if (time >= 4.5) return endY; // 稍微延長一點點總時間確保穩定
+            if (time >= 4.5) return endY; 
 
-            // 計算進度 (0 到 1)
             let t = (time - 1.4) / 3.1; 
-            
-            // 使用 Ease-Out Quadratic 緩動公式：1 - (1 - t) * (1 - t)
-            // 這能確保文字快到終點時是慢慢停下的，不會有反彈感
             const easeOut = 1 - (1 - t) * (1 - t);
             
             return startY + (endY - startY) * easeOut;
@@ -111,16 +107,15 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 📤 分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Video.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 分享' });
-        } catch (err) { console.log("Share failed"); }
+            await navigator.share({ files: [file], title: 'NightST 作品分享' });
+        } catch (err) { console.log("分享取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
