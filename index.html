@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 專業四點追蹤版</title>
+    <title>NightST - 均速減緩版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -33,50 +33,34 @@
         <input type="color" id="textColor" value="#00ff88">
     </div>
     <div class="btn-group">
-        <button id="runBtn">開始預覽</button>
-        <button id="shareBtn">錄製並分享</button>
+        <button id="runBtn">預覽</button>
+        <button id="shareBtn">錄製分享</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] - 專業追蹤模組
- * 這裡標定了綠板在不同時間點的「中心參考 Y 座標」
- * 藉由多個採樣點來精確對齊背景運鏡
+ * [FlipBoardModule]
+ * 核心調整：直接減慢 1.4s 到 3.1s 的移動速度
  */
 const FlipBoardModule = (() => {
-    // 採樣點：時間(s), Y座標(%) 
-    // 我們縮短採樣間隔，讓移動曲線完全貼合背景攀升速度
-    const trackPoints = [
-        { t: 1.4, y: -0.15 }, 
-        { t: 1.8, y: -0.18 }, 
-        { t: 2.2, y: -0.21 }, 
-        { t: 2.6, y: -0.22 }, // 攀升減速點
-        { t: 3.1, y: -0.18 }, // 畫面回穩
-        { t: 3.8, y: 0.05 },  // 開始滑落
-        { t: 4.5, y: 0.25 },  // 接近終點
-        { t: 5.0, y: 0.28 }   // 鎖定終點
-    ];
-
     return {
         getY: (h, time) => {
-            if (time <= trackPoints[0].t) return trackPoints[0].y * h;
-            if (time >= trackPoints[trackPoints.length - 1].t) return trackPoints[trackPoints.length - 1].y * h;
+            const startY = h * -0.05; // 出現位置
+            const midY = h * -0.12;   // 🚀 關鍵：減小 3.1s 時的高度，讓上升變慢
+            const finalY = h * 0.28;  // 最終位置
 
-            // 尋找所在區間
-            let i = 0;
-            while (i < trackPoints.length - 2 && time > trackPoints[i+1].t) i++;
+            // 🛠️ 1.4s - 3.1s：攀升階段 (大幅減速)
+            if (time < 3.1) {
+                const progress = (time - 1.4) / 1.7;
+                return startY + (midY - startY) * progress;
+            }
 
-            const p1 = trackPoints[i];
-            const p2 = trackPoints[i+1];
-            
-            // 計算區間內的線性比例
-            const progress = (time - p1.t) / (p2.t - p1.t);
-            
-            // 在 3.1s 之後的滑落階段加入緩動感
-            const ratio = (p1.t >= 3.1) ? (1 - Math.pow(1 - progress, 2)) : progress;
-            
-            return (p1.y + (p2.y - p1.y) * ratio) * h;
+            // 🛠️ 3.1s - 5.0s：滑落階段
+            if (time >= 5.0) return finalY;
+            const slideProgress = (time - 3.1) / 1.9;
+            const easeOut = 1 - Math.pow(1 - slideProgress, 3);
+            return midY + (finalY - midY) * easeOut;
         }
     };
 })();
@@ -105,14 +89,11 @@ function render() {
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        
         ctx.fillStyle = selectedColor;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
-        
-        // 霓虹發光效果
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 20;
         
@@ -139,13 +120,13 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_ProTrack.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Slow.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST 作品' }); } catch (err) {}
+        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_ProTrack.mp4'; a.click();
+        a.href = url; a.download = 'NightST.mp4'; a.click();
     }
 }
 
