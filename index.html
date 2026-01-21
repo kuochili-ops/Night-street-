@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 起始高度拉升版</title>
+    <title>NightST - 高位慢速穩定版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,22 +41,25 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：startY 從 -0.02 拉高至 -0.10
+ * 核心調整：
+ * 1. startY 拉高至 -0.18 (更高起始點)
+ * 2. midY 設為 -0.22 (縮小位移差距，極大程度減慢上升速度)
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.10; // 🚩 起始點拉高
-            const midY = h * -0.18;   // 🚩 同步調整攀升點，確保不衝過快
-            const finalY = h * 0.28;  // 終點不變
+            const startY = h * -0.18; // 🚩 起始點更高
+            const midY = h * -0.22;   // 🚩 攀升終點 (與起始點僅差 4%)
+            const finalY = h * 0.28;  // 最終綠板中央位置
 
-            // 🛠️ 0.8s - 3.1s：緩慢攀升階段
+            // 🛠️ 0.8s - 3.1s：極慢速攀升階段
             if (time < 3.1) {
                 const progress = Math.max(0, (time - 0.8) / 2.3);
+                // 使用線性移動確保均速
                 return startY + (midY - startY) * progress;
             }
 
-            // 🛠️ 3.1s - 5.0s：滑落階段
+            // 🛠️ 3.1s - 5.0s：平滑向下進入綠板
             if (time >= 5.0) return finalY;
             const slideProgress = (time - 3.1) / 1.9;
             const easeOut = 1 - Math.pow(1 - slideProgress, 3);
@@ -94,8 +97,10 @@ function render() {
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
+        
+        // 強化霓虹發光感
         ctx.shadowColor = selectedColor;
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 25;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
@@ -119,7 +124,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_HighStart.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_High_Slow.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
