@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 上方進入等速版</title>
+    <title>NightST - 定點縮放高品質版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -33,18 +33,23 @@
 </div>
 
 <script>
+/**
+ * [FlipBoardModule] 
+ * 處理定點運動邏輯：1.1s 開始，2.4s 準時停在綠板上緣。
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startTime = 1.2;
-            const startY = h * -0.2; // 上方畫面外
-            const endY = h * 0.28;  // 綠板上半部
-            const duration = 2.0;   // 調整此數值可改變進入快慢
+            const startTime = 1.1; 
+            const stopTime = 2.4;  // 🚩 定格時間點
+            const startY = h * -0.2; 
+            const endY = h * 0.22;   // 🏁 定格位置：綠板上緣
 
             if (time < startTime) return startY;
-            const elapsed = time - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            return startY + (endY - startY) * progress;
+            if (time > stopTime) return endY;
+
+            const progress = (time - startTime) / (stopTime - startTime);
+            return startY + (endY - startY) * progress; // 等速進場
         }
     };
 })();
@@ -68,26 +73,31 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
 
-    if (signText && time >= 1.2) {
+    if (signText && time >= 1.1) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 只有在進入畫布可見範圍內才繪圖
-        if (currentY > -h * 0.2 && currentY < h) {
-            ctx.fillStyle = "#00ff88"; 
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top"; 
-            const fontSize = h * 0.09;
-            ctx.font = `900 ${fontSize}px sans-serif`;
-            ctx.shadowColor = "#00ff88";
-            ctx.shadowBlur = 15;
-
-            const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
-            const lineHeight = fontSize * 1.2; 
-            lines.forEach((line, index) => {
-                ctx.fillText(line, w / 2, currentY + (index * lineHeight));
-            });
+        // --- 📏 自動縮放字體邏輯 ---
+        let fontSize = h * 0.09; // 預設大小
+        const maxContentHeight = h * 0.35; // 綠板最大容納高度
+        const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
+        
+        // 如果行數過多，縮小字體以確保不溢出
+        if (lines.length * fontSize * 1.2 > maxContentHeight) {
+            fontSize = maxContentHeight / (lines.length * 1.2);
         }
+
+        ctx.fillStyle = "#00ff88"; 
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top"; 
+        ctx.font = `900 ${fontSize}px sans-serif`;
+        ctx.shadowColor = "#00ff88";
+        ctx.shadowBlur = 15;
+
+        const lineHeight = fontSize * 1.2; 
+        lines.forEach((line, index) => {
+            ctx.fillText(line, w / 2, currentY + (index * lineHeight));
+        });
         ctx.restore();
     }
 
@@ -106,7 +116,7 @@ async function exportAndShare() {
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
-        catch (err) { console.log("Share canceled"); }
+        catch (err) { console.log("分享取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
