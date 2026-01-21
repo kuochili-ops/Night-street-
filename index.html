@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 背景同步貼合版</title>
+    <title>NightST - 綠板貼合就位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,29 +41,29 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心邏輯：抵銷鏡頭上升速度
- * 1. 0s - 3.1s: 文字由下(0.6)向上(0.15)升起，模擬貼在綠板上。
- * 2. 3.1s: 鏡頭停止，文字線性滑落到中心(0.28)。
+ * 核心目標：讓字「黏」在上升的綠板上
+ * 1. Start: 0.80 (畫面下方) -> End: 0.10 (畫面頂部)
+ * 2. 移除所有曲線，使用純線性銜接
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const trackStart = h * 0.60; // 🚩 開場時在下方（跟著綠板一起出來）
-            const trackEnd = h * 0.15;   // 🚩 3.1s 時跟隨鏡頭升到高位
-            const finalY = h * 0.28;     // 🚩 最終落點
+            const bottomStart = h * 0.85; // 🚩 開場藏在下方，準備隨綠板升起
+            const topPos = h * 0.10;      // 🚩 3.1s 隨鏡頭升到綠板上緣
+            const finalCenter = h * 0.28; // 🚩 最終綠板中央位置
 
-            // 🛠️ 階段一：0.0s - 3.1s (與背景同步升起)
+            // 🛠️ 階段一：0.0s - 3.1s (與綠板同步上升)
             if (time < 3.1) {
                 const progress = time / 3.1;
-                // 純線性移動，模擬背景攀升速度
-                return trackStart + (trackEnd - trackStart) * progress;
+                // 純線性移動，抵銷背景上升速度
+                return bottomStart + (topPos - bottomStart) * progress;
             }
 
-            // 🛠️ 階段二：3.1s - 5.0s (背景停，字下滑)
-            if (time >= 5.0) return finalY;
+            // 🛠️ 階段二：3.1s - 5.0s (綠板停住，字向下落位)
+            if (time >= 5.0) return finalCenter;
             const slideProgress = (time - 3.1) / 1.9;
-            // 使用線性銜接，移除反向煞車感
-            return trackEnd + (finalY - trackEnd) * slideProgress;
+            // 這裡也使用線性移動，消除煞車感
+            return topPos + (finalCenter - topPos) * slideProgress;
         }
     };
 })();
@@ -97,6 +97,7 @@ function render() {
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
+        
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 25;
         
@@ -122,7 +123,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Tracker.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_StickerMode.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
