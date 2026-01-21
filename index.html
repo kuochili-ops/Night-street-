@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 四點座標追蹤版</title>
+    <title>NightST - 速度修正對位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -18,7 +18,6 @@
         button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
         #shareBtn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(0, 255, 136, 0.3); }
-        .hint { font-size: 12px; color: #888; text-align: center; }
     </style>
 </head>
 <body>
@@ -37,45 +36,40 @@
         <button id="runBtn">預覽</button>
         <button id="shareBtn">錄製分享</button>
     </div>
-    <p class="hint">提示：文字現在會根據預設座標點隨鏡頭同步位移</p>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] - 平面追蹤模擬
- * 我們定義不同時間點綠板「中心點」的 Y 座標百分比 (0~1)
+ * [FlipBoardModule] 
+ * 修正文字向上衝過快的問題：降低 1.4s-3.1s 間的位移幅度
  */
 const FlipBoardModule = (() => {
-    // 關鍵幀數據 (時間: 秒, 畫面上緣對齊點: Y百分比)
+    // 關鍵幀 Y 座標微調 (百分比)
     const keyframes = [
-        { time: 1.4, y: -0.16 }, // 出現時在上方燈管
-        { time: 2.5, y: -0.35 }, // 畫面攀升最高點 (抵消位移)
-        { time: 3.2, y: -0.05 }, // 畫面回穩
-        { time: 5.0, y: 0.28 }   // 最終滑落至綠板中央
+        { time: 1.4, y: -0.16 }, // 出現
+        { time: 2.3, y: -0.25 }, // 🚀 降低位移頂點 (原本更低)，減緩向上衝的速度
+        { time: 3.1, y: -0.18 }, // 畫面停止攀升時的位置
+        { time: 5.0, y: 0.28 }   // 最終滑落位置
     ];
 
     return {
         getY: (h, time) => {
-            // 找到當前時間落在哪兩個關鍵幀之間
             let i = 0;
             while (i < keyframes.length - 2 && time > keyframes[i+1].time) {
                 i++;
             }
-            
             const start = keyframes[i];
             const end = keyframes[i+1];
             
             if (time < start.time) return start.y * h;
             if (time > end.time) return end.y * h;
 
-            // 線性插值計算當前位置
             const t = (time - start.time) / (end.time - start.time);
             
-            // 如果是最後一段滑落，使用平滑曲線，其餘段落使用線性追蹤
+            // 下滑段 (最後一段) 使用 Ease-Out，其餘段落使用線性追蹤確保速度均勻
             const ease = (i === keyframes.length - 2) ? (1 - Math.pow(1 - t, 3)) : t;
             
-            const interpolatedY = start.y + (end.y - start.y) * ease;
-            return interpolatedY * h;
+            return (start.y + (end.y - start.y) * ease) * h;
         }
     };
 })();
@@ -104,13 +98,11 @@ function render() {
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        
         ctx.fillStyle = selectedColor; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
         const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
-        
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 20;
         
@@ -130,11 +122,10 @@ function render() {
         ctx.drawImage(cornerImg, w - imgW - 20, h - imgH - 20, imgW, imgH);
         ctx.restore();
     }
-    
     requestAnimationFrame(render);
 }
 
-// 分享與錄影邏輯維持不變
+// 錄製邏輯
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
