@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致高位對焦版</title>
+    <title>NightST - 高度精準對位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -42,24 +42,24 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：起始點大幅上移 (anchorY: -0.22)
+ * 核心調整：起始點下修至 -0.10，並優化補償係數
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 起始點再拉高：鎖定在燈管更上方的黑影區域
-            const anchorY = h * -0.22; 
+            // 🚩 起始點下調：位於燈管下緣
+            const anchorY = h * -0.10; 
             const finalY = h * 0.28;   
 
             // 🛠️ 階段 1：畫面劇烈攀升期 (1.4s - 3.1s)
             if (time < 3.1) {
                 const climbFactor = (time - 1.4) / 1.7;
-                // 增加補償距離 (h * 0.28)，確保文字不會因為畫面上升而顯得「掉下來」
-                return anchorY - (h * 0.28 * climbFactor);
+                // 調整補償值，讓文字更自然地跟隨背景向上攀爬
+                return anchorY - (h * 0.15 * climbFactor);
             }
 
             // 🛠️ 階段 2：滑落期 (3.1s - 5.0s)
-            const postClimbY = anchorY - (h * 0.28); 
+            const postClimbY = anchorY - (h * 0.15); 
             if (time >= 5.0) return finalY;
 
             const slideT = (time - 3.1) / 1.9;
