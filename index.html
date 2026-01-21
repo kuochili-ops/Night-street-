@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 高位死鎖裁切版</title>
+    <title>NightST - 綠板貼合版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -40,25 +40,28 @@
 <script>
 /**
  * [FlipBoardModule]
- * 起始座標鎖定在 -0.05。
- * 字體高度為 0.10，所以座標在 -0.05 時，上半部會被 Canvas 頂端裁切掉。
- * 只有等綠板升上來到達頂部時，視覺上才會覺得字是黏在板子上出現的。
+ * 核心調整：
+ * 0s - 3.1s: 從 0.75 升到 -0.12 (與鏡頭攀升同步，讓字黏在綠板上)
+ * 3.1s - 5.0s: 從 -0.12 下滑到 0.28
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const staticPos = h * -0.05;  // 🚩 高位鎖定：上半部在畫面外
+            const syncStart = h * 0.75;  // 🚩 開場在下方，隨綠板現身
+            const syncEnd = h * -0.12;    // 🚩 3.1s 升到高位(稍微出界)
             const finalCenter = h * 0.28; // 🚩 最終下滑位置
 
-            // 0s - 3.1s 座標絕對不變，消除所有反向力/煞車感
+            // 🛠️ 階段一：隨鏡頭同步上升 (0.0s - 3.1s)
             if (time < 3.1) {
-                return staticPos;
+                const progress = time / 3.1;
+                // 純線性位移，抵銷背景上升感
+                return syncStart + (syncEnd - syncStart) * progress;
             }
 
-            // 3.1s 之後線性下滑
+            // 🛠️ 階段二：綠板到位，字線性下滑 (3.1s - 5.0s)
             if (time >= 5.0) return finalCenter;
             const slideProgress = (time - 3.1) / 1.9;
-            return staticPos + (finalCenter - staticPos) * slideProgress;
+            return syncEnd + (finalCenter - syncEnd) * slideProgress;
         }
     };
 })();
@@ -116,20 +119,12 @@ function render() {
     requestAnimationFrame(render);
 }
 
-async function exportAndShare() {
-    if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Clipped.mp4", { type: 'video/mp4' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
-    } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'NightST.mp4'; a.click();
-    }
+function prepareCanvas() {
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    video.currentTime = 0;
 }
 
-video.onended = () => { if (mediaRecorder?.state === "recording") mediaRecorder.stop(); };
 document.getElementById('runBtn').onclick = () => { prepareCanvas(); video.play(); render(); };
 document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
@@ -143,10 +138,17 @@ document.getElementById('shareBtn').onclick = () => {
     render();
 };
 
-function prepareCanvas() {
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    video.currentTime = 0;
+async function exportAndShare() {
+    if (recordedChunks.length === 0) return;
+    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Tracker_v2.mp4", { type: 'video/mp4' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
+    } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'NightST.mp4'; a.click();
+    }
 }
 </script>
 </body>
