@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - Ease-Out 同步版</title>
+    <title>NightST - 底部起步同步版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -33,26 +33,22 @@
 </div>
 
 <script>
-/**
- * [FlipBoardModule] 
- * 使用 Ease-Out 公式讓文字在 1.1s 出現時立即獲得高初速，解決「初期跟不上」的問題。
- */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.20; 
+            // 🟢 startY 設在 0.35 (底部)，endY 在 0.28 (上半部)
+            const startY = h * 0.35; 
             const endY = h * 0.28; 
-            const startTime = 1.1; 
-            const endTime = 4.2; // 稍微延長一點時間，讓最後一段滑行更平穩
+            const startTime = 1.2; // 稍微延後一點點啟動
+            const endTime = 4.5; 
 
             if (time < startTime) return startY;
             if (time > endTime) return endY; 
 
             let progress = (time - startTime) / (endTime - startTime);
             
-            // ✨ Ease-Out (Quadratic) 公式：1 - (1 - p)^2
-            // 這種曲線初期斜率大（速度快），後期斜率小（速度慢）
-            const easedProgress = 1 - Math.pow(1 - progress, 2); 
+            // 使用 Smoothstep 公式，讓字體隨畫面平滑攀升
+            const easedProgress = progress * progress * (3 - 2 * progress); 
 
             return startY + (endY - startY) * easedProgress;
         }
@@ -78,16 +74,16 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
 
-    if (signText && time > 1.1) {
+    if (signText && time > 1.2) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         ctx.fillStyle = "#00ff88"; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
-        const fontSize = h * 0.10; 
+        const fontSize = h * 0.09; // 稍微調小字體以防溢出綠板底部
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 15;
 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.2; 
@@ -109,11 +105,9 @@ function render() {
 async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
-
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-            await navigator.share({ files: [file], title: 'NightST 影片分享' });
-        } catch (err) { console.log("分享取消"); }
+        try { await navigator.share({ files: [file], title: 'NightST 影片分享' }); } 
+        catch (err) { console.log("分享取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
