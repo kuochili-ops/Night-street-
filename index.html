@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 速度修正對位版</title>
+    <title>NightST - 專業四點追蹤版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -33,43 +33,50 @@
         <input type="color" id="textColor" value="#00ff88">
     </div>
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製分享</button>
+        <button id="runBtn">開始預覽</button>
+        <button id="shareBtn">錄製並分享</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 修正文字向上衝過快的問題：降低 1.4s-3.1s 間的位移幅度
+ * [FlipBoardModule] - 專業追蹤模組
+ * 這裡標定了綠板在不同時間點的「中心參考 Y 座標」
+ * 藉由多個採樣點來精確對齊背景運鏡
  */
 const FlipBoardModule = (() => {
-    // 關鍵幀 Y 座標微調 (百分比)
-    const keyframes = [
-        { time: 1.4, y: -0.16 }, // 出現
-        { time: 2.3, y: -0.25 }, // 🚀 降低位移頂點 (原本更低)，減緩向上衝的速度
-        { time: 3.1, y: -0.18 }, // 畫面停止攀升時的位置
-        { time: 5.0, y: 0.28 }   // 最終滑落位置
+    // 採樣點：時間(s), Y座標(%) 
+    // 我們縮短採樣間隔，讓移動曲線完全貼合背景攀升速度
+    const trackPoints = [
+        { t: 1.4, y: -0.15 }, 
+        { t: 1.8, y: -0.18 }, 
+        { t: 2.2, y: -0.21 }, 
+        { t: 2.6, y: -0.22 }, // 攀升減速點
+        { t: 3.1, y: -0.18 }, // 畫面回穩
+        { t: 3.8, y: 0.05 },  // 開始滑落
+        { t: 4.5, y: 0.25 },  // 接近終點
+        { t: 5.0, y: 0.28 }   // 鎖定終點
     ];
 
     return {
         getY: (h, time) => {
-            let i = 0;
-            while (i < keyframes.length - 2 && time > keyframes[i+1].time) {
-                i++;
-            }
-            const start = keyframes[i];
-            const end = keyframes[i+1];
-            
-            if (time < start.time) return start.y * h;
-            if (time > end.time) return end.y * h;
+            if (time <= trackPoints[0].t) return trackPoints[0].y * h;
+            if (time >= trackPoints[trackPoints.length - 1].t) return trackPoints[trackPoints.length - 1].y * h;
 
-            const t = (time - start.time) / (end.time - start.time);
+            // 尋找所在區間
+            let i = 0;
+            while (i < trackPoints.length - 2 && time > trackPoints[i+1].t) i++;
+
+            const p1 = trackPoints[i];
+            const p2 = trackPoints[i+1];
             
-            // 下滑段 (最後一段) 使用 Ease-Out，其餘段落使用線性追蹤確保速度均勻
-            const ease = (i === keyframes.length - 2) ? (1 - Math.pow(1 - t, 3)) : t;
+            // 計算區間內的線性比例
+            const progress = (time - p1.t) / (p2.t - p1.t);
             
-            return (start.y + (end.y - start.y) * ease) * h;
+            // 在 3.1s 之後的滑落階段加入緩動感
+            const ratio = (p1.t >= 3.1) ? (1 - Math.pow(1 - progress, 2)) : progress;
+            
+            return (p1.y + (p2.y - p1.y) * ratio) * h;
         }
     };
 })();
@@ -80,7 +87,7 @@ const ctx = canvas.getContext('2d');
 const signInput = document.getElementById('signText');
 const colorInput = document.getElementById('textColor');
 const cornerImg = new Image();
-cornerImg.src = 'IMG_6604.png'; 
+cornerImg.src = 'IMG_6604.png';
 
 let mediaRecorder;
 let recordedChunks = [];
@@ -98,16 +105,19 @@ function render() {
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        ctx.fillStyle = selectedColor; 
+        
+        ctx.fillStyle = selectedColor;
         ctx.textAlign = "center";
-        ctx.textBaseline = "top"; 
-        const fontSize = h * 0.10; 
+        ctx.textBaseline = "top";
+        const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
+        
+        // 霓虹發光效果
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 20;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
-        const lineHeight = fontSize * 1.25; 
+        const lineHeight = fontSize * 1.25;
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -117,7 +127,7 @@ function render() {
     if (time >= 3.0) {
         ctx.save();
         const imgW = w * 0.25;
-        const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
+        const imgH = imgW * (cornerImg.height / cornerImg.width || 1);
         ctx.globalAlpha = Math.min(1, (time - 3.0) * 2);
         ctx.drawImage(cornerImg, w - imgW - 20, h - imgH - 20, imgW, imgH);
         ctx.restore();
@@ -125,17 +135,17 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製邏輯
+// 錄製與分享
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Tracked.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_ProTrack.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
+        try { await navigator.share({ files: [file], title: 'NightST 作品' }); } catch (err) {}
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST.mp4'; a.click();
+        a.href = url; a.download = 'NightST_ProTrack.mp4'; a.click();
     }
 }
 
