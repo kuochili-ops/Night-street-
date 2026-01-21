@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 定點補償與輸出修復版</title>
+    <title>NightST - 輸出功能修復與位置優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -40,7 +40,7 @@ const FlipBoardModule = (() => {
             const startTime = 1.1; 
             const stopTime = 2.4;  
             const startY = h * -0.2; 
-            const endY = h * 0.15; // 🚩 位置上移
+            const endY = h * 0.12; // 🚩 位置再往上提 (原本是 0.15)
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -48,8 +48,8 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 🏎️ 動態補償：抵消背景上移
-            const driftRate = h * 0.1; 
+            // 🏎️ 動態補償：精確抵消背景攀升速度
+            const driftRate = h * 0.088; 
             return endY + (driftRate * (time - stopTime)); 
         }
     };
@@ -78,7 +78,6 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 📏 自動縮放字體
         let fontSize = h * 0.09;
         const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -110,23 +109,41 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製修復邏輯
+// 錄製修復與相容性邏輯
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+    
+    const types = ["video/mp4", "video/webm;codecs=vp9", "video/webm"];
+    const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/mp4";
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const file = new File([blob], "NightST_Export.mp4", { type: mimeType });
     
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
-        catch (err) { console.log("分享取消"); }
+        try { 
+            await navigator.share({ files: [file], title: 'NightST 影片作品' }); 
+        } catch (err) { 
+            triggerDownload(blob); 
+        }
     } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Export.mp4'; a.click();
+        triggerDownload(blob);
     }
 }
 
-video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
+function triggerDownload(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'NightST_Export.mp4';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+video.onended = () => { 
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+    }
+};
 
 document.getElementById('runBtn').onclick = () => { setup(); video.play(); render(); };
 
@@ -135,16 +152,19 @@ document.getElementById('shareBtn').onclick = () => {
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
     
-    // 選取支援的錄製格式
     const types = ["video/mp4", "video/webm;codecs=vp9", "video/webm"];
     const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || "";
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = exportAndShare;
-    mediaRecorder.start();
-    video.play();
-    render();
+    try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = exportAndShare;
+        mediaRecorder.start();
+        video.play();
+        render();
+    } catch (e) {
+        alert("目前瀏覽器不支援錄製功能，請嘗試使用不同的瀏覽器（如 Chrome）。");
+    }
 };
 
 function setup() {
