@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 綠板貼合就位版</title>
+    <title>NightST - 座標死鎖版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -12,12 +12,11 @@
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; }
-        input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
+        input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; }
         input[type="color"] { width: 50px; height: 52px; border: 1px solid #333; background: #1a1a1a; cursor: pointer; border-radius: 8px; }
-        .btn-group { display: flex; gap: 10px; }
-        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
+        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; }
         #runBtn { background: #333; color: #eee; }
-        #shareBtn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(0, 255, 136, 0.3); }
+        #shareBtn { background: var(--accent); color: #000; }
     </style>
 </head>
 <body>
@@ -32,7 +31,7 @@
         <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
         <input type="color" id="textColor" value="#00ff88">
     </div>
-    <div class="btn-group">
+    <div class="btn-group" style="display:flex; gap:10px;">
         <button id="runBtn">預覽</button>
         <button id="shareBtn">錄製分享</button>
     </div>
@@ -41,29 +40,25 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心目標：讓字「黏」在上升的綠板上
- * 1. Start: 0.80 (畫面下方) -> End: 0.10 (畫面頂部)
- * 2. 移除所有曲線，使用純線性銜接
+ * 核心：0s - 3.1s 座標絕對不動 (靜止在 0.10)
+ * 讓背景的綠板「撞」上文字，產生字在板子上的錯覺
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const bottomStart = h * 0.85; // 🚩 開場藏在下方，準備隨綠板升起
-            const topPos = h * 0.10;      // 🚩 3.1s 隨鏡頭升到綠板上緣
-            const finalCenter = h * 0.28; // 🚩 最終綠板中央位置
+            const staticPos = h * 0.10;   // 🚩 文字預先就位的物理座標
+            const finalCenter = h * 0.28; // 🚩 最終下滑落點
 
-            // 🛠️ 階段一：0.0s - 3.1s (與綠板同步上升)
+            // 🛠️ 3.1s 之前，座標鎖死，完全不動
             if (time < 3.1) {
-                const progress = time / 3.1;
-                // 純線性移動，抵銷背景上升速度
-                return bottomStart + (topPos - bottomStart) * progress;
+                return staticPos;
             }
 
-            // 🛠️ 階段二：3.1s - 5.0s (綠板停住，字向下落位)
+            // 🛠️ 3.1s 之後，綠板停住，文字才開始下滑
             if (time >= 5.0) return finalCenter;
             const slideProgress = (time - 3.1) / 1.9;
-            // 這裡也使用線性移動，消除煞車感
-            return topPos + (finalCenter - topPos) * slideProgress;
+            // 線性下滑，保證銜接順暢
+            return staticPos + (finalCenter - staticPos) * slideProgress;
         }
     };
 })();
@@ -92,17 +87,19 @@ function render() {
     if (signText) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
+        
         ctx.fillStyle = selectedColor;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
-        
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 25;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
+
+        // 🚩 這裡不需要裁切，因為畫布邊界會自動裁切掉負值或超出邊界的字
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -123,7 +120,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_StickerMode.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Locked.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
