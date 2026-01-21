@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 視覺對位與選色優化版</title>
+    <title>NightST - 極致高位對焦版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -42,28 +42,24 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心：動態補償背景攀升位移
- * 確保文字在 1.4s 出現後，視覺上「鎖死」在燈管下
+ * 核心調整：起始點大幅上移 (anchorY: -0.22)
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 文字最初在燈管下的絕對高度
-            const anchorY = h * -0.05; 
-            // 綠板中央的最終高度
+            // 🚩 起始點再拉高：鎖定在燈管更上方的黑影區域
+            const anchorY = h * -0.22; 
             const finalY = h * 0.28;   
 
             // 🛠️ 階段 1：畫面劇烈攀升期 (1.4s - 3.1s)
-            // 隨著畫面向上攀爬，我們必須主動減小 Y 座標來抵消視覺位移
             if (time < 3.1) {
                 const climbFactor = (time - 1.4) / 1.7;
-                // 補償值 0.22 是根據影片中綠板從頂部移動到中央的比例計算的
-                return anchorY - (h * 0.22 * climbFactor);
+                // 增加補償距離 (h * 0.28)，確保文字不會因為畫面上升而顯得「掉下來」
+                return anchorY - (h * 0.28 * climbFactor);
             }
 
-            // 🛠️ 階段 2：畫面穩定後 (3.1s 之後)
-            // 由於補償，此時文字高度會變成 h * -0.27 左右
-            const postClimbY = anchorY - (h * 0.22); 
+            // 🛠️ 階段 2：滑落期 (3.1s - 5.0s)
+            const postClimbY = anchorY - (h * 0.28); 
             if (time >= 5.0) return finalY;
 
             const slideT = (time - 3.1) / 1.9;
@@ -94,7 +90,6 @@ function render() {
     const signText = signInput.value;
     const selectedColor = colorInput.value;
 
-    // 回歸 1.4s 出現文字
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
@@ -128,7 +123,6 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄影分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
