@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 穩定定格與平滑動態版</title>
+    <title>NightST - 絕對穩定版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -37,28 +37,20 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 修正「出現後立即下移」的感覺：使用 Ease-In-Out
- * 前期移動非常緩慢，視覺上會接近定格
+ * 解決先下後上：2.0s 前絕對定格，隨後線性下滑至 0.35
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startY = h * -0.25; 
-            const endY = h * 0.33;   
+            const endY = h * 0.35;   // 🚀 終點再下移一點
             
-            if (time < 1.4) return startY;
+            if (time < 2.0) return startY; // 🛑 1.4s 到 2.0s 絕對定格，消除移動感
             if (time >= 4.5) return endY; 
 
-            // 計算進度 (0 到 1)
-            let t = (time - 1.4) / 3.1; 
-            
-            // 🚀 使用 Ease-In-Out Cubic 緩動：t < 0.5 ? 4t³ : 1 - (-2t + 2)³/2
-            // 這會讓文字在 1.4s 出現後，有一段「啟動加速」的過程，不會立刻感覺在掉
-            const easeInOut = t < 0.5 
-                ? 4 * t * t * t 
-                : 1 - Math.pow(-2 * t + 2, 3) / 2;
-            
-            return startY + (endY - startY) * easeInOut;
+            // 2.0s 到 4.5s 採線性移動，確保不會有反彈
+            const progress = (time - 2.0) / 2.5; 
+            return startY + (endY - startY) * progress;
         }
     };
 })();
@@ -117,11 +109,11 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Art.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Video.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 創作分享' });
+            await navigator.share({ files: [file], title: 'NightST 分享' });
         } catch (err) { console.log("Share cancelled"); }
     } else {
         const url = URL.createObjectURL(blob);
