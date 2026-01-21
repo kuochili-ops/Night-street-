@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 絕對穩定版</title>
+    <title>NightST - 視覺同步與選色版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -11,7 +11,9 @@
         canvas, video { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
-        input { padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
+        .input-row { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
+        input[type="color"] { width: 50px; height: 50px; border: none; background: none; cursor: pointer; }
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
@@ -27,7 +29,10 @@
 </div>
 
 <div class="controls">
-    <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
+    <div class="input-row">
+        <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
+        <input type="color" id="textColor" value="#00ff88">
+    </div>
     <div class="btn-group">
         <button id="runBtn">預覽效果</button>
         <button id="shareBtn">錄製並分享 🎬</button>
@@ -37,20 +42,22 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 解決先下後上：2.0s 前絕對定格，隨後線性下滑至 0.35
+ * 修正相對位移：在 3.2s 畫面穩定前，文字固定在燈管下方 (startY)
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.25; 
-            const endY = h * 0.35;   // 🚀 終點再下移一點
+            const startY = h * -0.18; // 🚩 固定在燈管下的起始高度
+            const endY = h * 0.30;   // 📍 綠板中央偏下的終點
             
-            if (time < 2.0) return startY; // 🛑 1.4s 到 2.0s 絕對定格，消除移動感
-            if (time >= 4.5) return endY; 
+            // 🛑 1.4s 到 3.2s 絕對定格，這段時間畫面正在向上攀升
+            if (time < 3.2) return startY; 
+            if (time >= 5.0) return endY; 
 
-            // 2.0s 到 4.5s 採線性移動，確保不會有反彈
-            const progress = (time - 2.0) / 2.5; 
-            return startY + (endY - startY) * progress;
+            // 3.2s 到 5.0s 畫面穩定後，才開始平滑下滑
+            const t = (time - 3.2) / 1.8; 
+            const easeOut = 1 - Math.pow(1 - t, 2); // 平滑減速停止
+            return startY + (endY - startY) * easeOut;
         }
     };
 })();
@@ -59,6 +66,7 @@ const video = document.getElementById('mainVideo');
 const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
 const signInput = document.getElementById('signText');
+const colorInput = document.getElementById('textColor');
 const cornerImg = new Image();
 cornerImg.src = 'IMG_6604.png'; 
 
@@ -73,20 +81,24 @@ function render() {
     
     const time = video.currentTime;
     const signText = signInput.value;
+    const selectedColor = colorInput.value;
 
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        ctx.fillStyle = "#00ff88"; 
+        
+        ctx.fillStyle = selectedColor; 
         ctx.textAlign = "center";
         ctx.textBaseline = "top"; 
         const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
-        ctx.shadowColor = "#00ff88";
+        
+        // 發光顏色跟隨文字顏色
+        ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 20;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
-        const lineHeight = fontSize * 1.25; 
+        const lineHeight = fontSize * 1.2; 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -97,9 +109,8 @@ function render() {
         ctx.save();
         const imgW = w * 0.25;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
-        const padding = 20;
         ctx.globalAlpha = Math.min(1, (time - 3.0) * 2);
-        ctx.drawImage(cornerImg, w - imgW - padding, h - imgH - padding, imgW, imgH);
+        ctx.drawImage(cornerImg, w - imgW - 20, h - imgH - 20, imgW, imgH);
         ctx.restore();
     }
     
@@ -109,24 +120,21 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Video.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Custom.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 分享' });
-        } catch (err) { console.log("Share cancelled"); }
+            await navigator.share({ files: [file], title: 'My NightST Creation' });
+        } catch (err) { console.log("Share skipped"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Export.mp4'; a.click();
+        a.href = url; a.download = 'NightST_Custom.mp4'; a.click();
     }
-    recordedChunks = [];
 }
 
 video.onended = () => {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-    }
+    if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
 };
 
 document.getElementById('runBtn').onclick = () => {
@@ -141,11 +149,8 @@ document.getElementById('shareBtn').onclick = () => {
     const stream = canvas.captureStream(30); 
     const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
 
-    mediaRecorder = new MediaRecorder(stream, {
-        mimeType: mimeType,
-        videoBitsPerSecond: 10000000 
-    });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10000000 });
+    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
     mediaRecorder.onstop = exportAndShare;
     mediaRecorder.start(100); 
     video.play();
