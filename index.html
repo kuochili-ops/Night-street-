@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 開場即現鎖定版</title>
+    <title>NightST - 降低起始位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,21 +41,19 @@
 <script>
 /**
  * [FlipBoardModule]
- * 1. 0.0s - 3.1s: 位置絕對固定在 -0.25 (無任何位移速度)
- * 2. 3.1s - 5.0s: 執行下滑動作
+ * 1. 0.0s - 3.1s: 位置鎖定在 -0.10 (稍微降低，讓它早點進入視野)
+ * 2. 3.1s - 5.0s: 向下滑動
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const staticY = h * -0.25; 
+            const staticY = h * -0.10; // 🚩 下修起始位置，從 -0.25 降到 -0.10
             const finalY = h * 0.28;   
 
-            // 🛠️ 3.1s 之前保持絕對靜止
             if (time < 3.1) {
                 return staticY;
             }
 
-            // 🛠️ 3.1s 之後執行下滑
             if (time >= 5.0) return finalY;
             const slideProgress = (time - 3.1) / 1.9;
             const easeOut = 1 - Math.pow(1 - slideProgress, 3); 
@@ -85,7 +83,6 @@ function render() {
     const signText = signInput.value;
     const selectedColor = colorInput.value;
 
-    // 🚩 提早到 0.0s，開場即顯示
     if (signText) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
@@ -120,7 +117,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Immediate.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Adjusted.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
