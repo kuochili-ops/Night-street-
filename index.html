@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 深度滑入版 (-0.4)</title>
+    <title>NightST - 無煞車就定位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,26 +41,27 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：hiddenStart = -0.40
+ * 核心微調：取消 3.1s 的 easeOut 緩衝，改為線性銜接
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const hiddenStart = h * -0.40; // 🚩 從極高處出發，確保完全隱形
-            const readyPos = h * 0.02;     // 3.1s 時到達的位置
-            const finalY = h * 0.28;       // 5.0s 最終位置
+            const hiddenStart = h * -0.40; 
+            const readyPos = h * 0.02;     
+            const finalY = h * 0.28;       
 
-            // 🛠️ 階段一：0.0s - 3.1s (文字緩慢從高處降落進入畫面)
+            // 🛠️ 階段一：0.0s - 3.1s (線性勻速進入，無煞車感)
             if (time < 3.1) {
                 const progress = time / 3.1;
                 return hiddenStart + (readyPos - hiddenStart) * progress;
             }
 
-            // 🛠️ 階段二：3.1s - 5.0s (滑入綠板)
+            // 🛠️ 階段二：3.1s - 5.0s (直接滑入綠板)
             if (time >= 5.0) return finalY;
             const slideProgress = (time - 3.1) / 1.9;
-            const easeOut = 1 - Math.pow(1 - slideProgress, 3);
-            return readyPos + (finalY - readyPos) * easeOut;
+            // 下滑階段仍保留平滑效果，但起始銜接不再有回彈感
+            const easeOutSlide = 1 - Math.pow(1 - slideProgress, 2); 
+            return readyPos + (finalY - readyPos) * easeOutSlide;
         }
     };
 })();
@@ -119,7 +120,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_v04.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Direct.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
