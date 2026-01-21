@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 5.1s 延時對位版</title>
+    <title>NightST - 最終對位優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,23 +37,22 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製並分享 🎬</button>
+        <button id="shareBtn">高品質錄製並分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 依照觀察：0.8s 進場，2.4s 定格，5.1s 煞車。
+ * [FlipBoardModule] 最終精調版
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
             const stopTime = 2.4;  
-            const endTime = 5.1;   // 🚩 更新為 5.1s 煞車
+            const endTime = 5.1;   
             const startY = h * -0.2; 
-            const endY = h * 0.18; 
+            const endY = h * 0.25; // 🚩 調低起始定格點，改善最終偏高的問題
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -61,7 +60,7 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            const driftRate = h * 0.096; // 維持原速率
+            const driftRate = h * 0.096; 
             const effectiveDriftTime = Math.min(time, endTime) - stopTime;
             
             return endY + (driftRate * effectiveDriftTime); 
@@ -104,7 +103,7 @@ function render() {
 
         ctx.fillStyle = chosenColor; 
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle"; // 🚩 置中對齊
+        ctx.textBaseline = "middle"; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = chosenColor;
         ctx.shadowBlur = 15;
@@ -128,11 +127,12 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄影分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: "video/mp4" });
-    const file = new File([blob], "NightST_Export.mp4", { type: "video/mp4" });
+    const types = ["video/mp4", "video/webm"];
+    const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/mp4";
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const file = new File([blob], "NightST_Final.mp4", { type: mimeType });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
         catch (err) { triggerDownload(blob); }
@@ -142,7 +142,7 @@ async function exportAndShare() {
 function triggerDownload(blob) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Export.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Final.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
