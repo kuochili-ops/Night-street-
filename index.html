@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 等速進場錄製版</title>
+    <title>NightST - 上方進入等速版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,16 +37,13 @@ const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 1.2;
-            const startY = h * 1.1; // 從畫面下方外開始
-            const endY = h * 0.28;  // 定位在綠板上半部
-            const duration = 2.8;   // 移動總時長
+            const startY = h * -0.2; // 上方畫面外
+            const endY = h * 0.28;  // 綠板上半部
+            const duration = 2.0;   // 調整此數值可改變進入快慢
 
             if (time < startTime) return startY;
-            
             const elapsed = time - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            
-            // 線性等速公式
             return startY + (endY - startY) * progress;
         }
     };
@@ -71,13 +68,12 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
 
-    // 🚩 只有在 1.2s 後才繪製文字，避免一開始就在畫面上
     if (signText && time >= 1.2) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 只有在進入畫面範圍內才實際繪圖
-        if (currentY < h + 100) {
+        // 只有在進入畫布可見範圍內才繪圖
+        if (currentY > -h * 0.2 && currentY < h) {
             ctx.fillStyle = "#00ff88"; 
             ctx.textAlign = "center";
             ctx.textBaseline = "top"; 
@@ -104,13 +100,13 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// ... 其餘錄製與分享邏輯保持不變 ...
+// 錄製與分享邏輯
 async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST 影片分享' }); } 
-        catch (err) { console.log("分享取消"); }
+        try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
+        catch (err) { console.log("Share canceled"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
