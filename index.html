@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 真正慢速滑入版</title>
+    <title>NightST - 深度滑入版 (-0.4)</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
-        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; overflow: hidden; border-radius: 8px; }
+        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; overflow: hidden; border-radius: 8px; border: 1px solid #333; }
         canvas, video { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; }
         input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; }
         input[type="color"] { width: 50px; height: 52px; border: 1px solid #333; background: #1a1a1a; cursor: pointer; border-radius: 8px; }
-        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
-        #shareBtn { background: var(--accent); color: #000; }
+        #shareBtn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(0, 255, 136, 0.3); }
     </style>
 </head>
 <body>
@@ -31,28 +32,27 @@
         <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
         <input type="color" id="textColor" value="#00ff88">
     </div>
-    <div class="btn-group" style="display:flex; gap:10px;">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製分享</button>
+    <div class="btn-group">
+        <button id="runBtn">預覽效果</button>
+        <button id="shareBtn">錄製分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 調整起始位置至 -0.30，確保開場完全看不見，再慢慢滑入
+ * 核心調整：hiddenStart = -0.40
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const hiddenStart = h * -0.30; // 🚩 拉得更高，確保發光和第二行也藏住
-            const readyPos = h * 0.02;     // 3.1s 時到達的位置 (畫面頂端)
+            const hiddenStart = h * -0.40; // 🚩 從極高處出發，確保完全隱形
+            const readyPos = h * 0.02;     // 3.1s 時到達的位置
             const finalY = h * 0.28;       // 5.0s 最終位置
 
-            // 🛠️ 階段一：0.0s - 3.1s (文字從隱形到慢慢降落)
+            // 🛠️ 階段一：0.0s - 3.1s (文字緩慢從高處降落進入畫面)
             if (time < 3.1) {
                 const progress = time / 3.1;
-                // 均速進入，讓速度更慢一點
                 return hiddenStart + (readyPos - hiddenStart) * progress;
             }
 
@@ -89,8 +89,6 @@ function render() {
     if (signText) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
-        
-        // 增強視覺質感
         ctx.fillStyle = selectedColor;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
@@ -101,8 +99,6 @@ function render() {
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
-        
-        // 渲染文字
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -120,11 +116,10 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_SlideIn.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_v04.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
