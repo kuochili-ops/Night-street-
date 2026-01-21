@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 深度死鎖裁切版</title>
+    <title>NightST - 深度負值絕對死鎖版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -15,7 +15,7 @@
         input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; }
         input[type="color"] { width: 50px; height: 52px; border: 1px solid #333; background: #1a1a1a; cursor: pointer; border-radius: 8px; }
         .btn-group { display: flex; gap: 10px; }
-        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; }
         #runBtn { background: #333; color: #eee; }
         #shareBtn { background: var(--accent); color: #000; }
     </style>
@@ -41,15 +41,15 @@
 <script>
 /**
  * [FlipBoardModule]
- * 解決「字黏在上方」的問題。
- * 將文字死鎖在 -0.22 的位置，確保所有內容（包含發光）起初都在畫面外。
+ * 絕對死鎖邏輯：
+ * 使用大的負值 (-0.35) 確保開場完全看不見字。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 鎖定在 -0.22。字體大約佔 0.10，發光佔一些，
-            // 這樣設定能確保開場時畫面上方是乾淨的黑邊。
-            return h * -0.22; 
+            // 🚩 鎖定在 -0.35。這是一個「大的負值」。
+            // 字在那裡等著，直到背景綠板升上來「接住」它。
+            return h * -0.35; 
         }
     };
 })();
@@ -84,15 +84,13 @@ function render() {
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
-        
-        // 霓虹發光
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 25;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
 
-        // 座標死鎖，字不動，等背景升上來
+        // 字完全不動，等畫面。
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -132,7 +130,7 @@ document.getElementById('shareBtn').onclick = () => {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_DeepFixed.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_LargeNegative.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
