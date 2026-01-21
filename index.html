@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 座標死鎖版</title>
+    <title>NightST - 高位死鎖裁切版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -40,24 +40,24 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心：0s - 3.1s 座標絕對不動 (靜止在 0.10)
- * 讓背景的綠板「撞」上文字，產生字在板子上的錯覺
+ * 起始座標鎖定在 -0.05。
+ * 字體高度為 0.10，所以座標在 -0.05 時，上半部會被 Canvas 頂端裁切掉。
+ * 只有等綠板升上來到達頂部時，視覺上才會覺得字是黏在板子上出現的。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const staticPos = h * 0.10;   // 🚩 文字預先就位的物理座標
-            const finalCenter = h * 0.28; // 🚩 最終下滑落點
+            const staticPos = h * -0.05;  // 🚩 高位鎖定：上半部在畫面外
+            const finalCenter = h * 0.28; // 🚩 最終下滑位置
 
-            // 🛠️ 3.1s 之前，座標鎖死，完全不動
+            // 0s - 3.1s 座標絕對不變，消除所有反向力/煞車感
             if (time < 3.1) {
                 return staticPos;
             }
 
-            // 🛠️ 3.1s 之後，綠板停住，文字才開始下滑
+            // 3.1s 之後線性下滑
             if (time >= 5.0) return finalCenter;
             const slideProgress = (time - 3.1) / 1.9;
-            // 線性下滑，保證銜接順暢
             return staticPos + (finalCenter - staticPos) * slideProgress;
         }
     };
@@ -99,7 +99,6 @@ function render() {
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
 
-        // 🚩 這裡不需要裁切，因為畫布邊界會自動裁切掉負值或超出邊界的字
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -120,7 +119,7 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Locked.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Clipped.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
