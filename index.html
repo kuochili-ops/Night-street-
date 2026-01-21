@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 綠板貼合版</title>
+    <title>NightST - 高位死鎖靜止版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -40,28 +40,15 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心調整：
- * 0s - 3.1s: 從 0.75 升到 -0.12 (與鏡頭攀升同步，讓字黏在綠板上)
- * 3.1s - 5.0s: 從 -0.12 下滑到 0.28
+ * 核心：座標永久固定在 -0.15，不隨時間改變。
+ * 這會讓文字產生「在那裡等著被畫面拍到」的物理質感。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const syncStart = h * 0.75;  // 🚩 開場在下方，隨綠板現身
-            const syncEnd = h * -0.12;    // 🚩 3.1s 升到高位(稍微出界)
-            const finalCenter = h * 0.28; // 🚩 最終下滑位置
-
-            // 🛠️ 階段一：隨鏡頭同步上升 (0.0s - 3.1s)
-            if (time < 3.1) {
-                const progress = time / 3.1;
-                // 純線性位移，抵銷背景上升感
-                return syncStart + (syncEnd - syncStart) * progress;
-            }
-
-            // 🛠️ 階段二：綠板到位，字線性下滑 (3.1s - 5.0s)
-            if (time >= 5.0) return finalCenter;
-            const slideProgress = (time - 3.1) / 1.9;
-            return syncEnd + (finalCenter - syncEnd) * slideProgress;
+            // 🚩 將字提到更高位置 (-0.15)，確保開場只露出一點點或完全不露。
+            // 並且移除了所有隨時間位移的判斷，字永遠釘在這裡。
+            return h * -0.15; 
         }
     };
 })();
@@ -102,6 +89,7 @@ function render() {
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
 
+        // 座標固定不動，文字會隨著影片背景上升而自然顯現完整
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -119,12 +107,20 @@ function render() {
     requestAnimationFrame(render);
 }
 
-function prepareCanvas() {
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    video.currentTime = 0;
+async function exportAndShare() {
+    if (recordedChunks.length === 0) return;
+    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Fixed.mp4", { type: 'video/mp4' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
+    } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'NightST.mp4'; a.click();
+    }
 }
 
+video.onended = () => { if (mediaRecorder?.state === "recording") mediaRecorder.stop(); };
 document.getElementById('runBtn').onclick = () => { prepareCanvas(); video.play(); render(); };
 document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
@@ -138,17 +134,10 @@ document.getElementById('shareBtn').onclick = () => {
     render();
 };
 
-async function exportAndShare() {
-    if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Tracker_v2.mp4", { type: 'video/mp4' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
-    } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'NightST.mp4'; a.click();
-    }
+function prepareCanvas() {
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    video.currentTime = 0;
 }
 </script>
 </body>
