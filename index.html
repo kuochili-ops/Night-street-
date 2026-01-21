@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 計時對位與顏色自訂版</title>
+    <title>NightST - 最終精確對位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -36,7 +36,7 @@
         </div>
     </div>
     <div class="btn-group">
-        <button id="runBtn">預覽 (帶計時器)</button>
+        <button id="runBtn">預覽</button>
         <button id="shareBtn">高品質錄製並分享 🎬</button>
     </div>
 </div>
@@ -46,10 +46,10 @@
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startTime = 1.1; 
-            const stopTime = 2.4;  
+            const startTime = 0.8;   // 🚩 根據觀察提前進場
+            const stopTime = 2.4;    
             const startY = h * -0.2; 
-            const endY = h * 0.12; // 提高定點位置
+            const endY = h * 0.12;   
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -57,8 +57,8 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 🏎️ 動態補償：抵消背景上移
-            const driftRate = h * 0.092; 
+            // 🏎️ 補償係數微調至 0.096，鎖定 4.1 秒的最佳位置
+            const driftRate = h * 0.096; 
             return endY + (driftRate * (time - stopTime)); 
         }
     };
@@ -82,21 +82,14 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     
     const time = video.currentTime;
-    
-    // 🔢 顯示除錯計時器 (Debug Timer)
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(10, 10, 120, 40);
-    ctx.fillStyle = "white";
-    ctx.font = "bold 20px monospace";
-    ctx.fillText(`Time: ${time.toFixed(3)}`, 20, 35);
-
     const signText = signInput.value;
     const chosenColor = colorInput.value;
 
-    if (signText && time >= 1.1) {
+    if (signText && time >= 0.8) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
+        // 自動縮放字體
         let fontSize = h * 0.09;
         const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -128,7 +121,6 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製分享邏輯
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
