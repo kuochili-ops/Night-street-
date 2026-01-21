@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 定點縮放高品質版</title>
+    <title>NightST - 動態黏著補償版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -33,23 +33,23 @@
 </div>
 
 <script>
-/**
- * [FlipBoardModule] 
- * 處理定點運動邏輯：1.1s 開始，2.4s 準時停在綠板上緣。
- */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 1.1; 
-            const stopTime = 2.4;  // 🚩 定格時間點
+            const stopTime = 2.4;  
             const startY = h * -0.2; 
-            const endY = h * 0.22;   // 🏁 定格位置：綠板上緣
+            const endY = h * 0.22;   
 
             if (time < startTime) return startY;
-            if (time > stopTime) return endY;
+            if (time <= stopTime) {
+                const progress = (time - startTime) / (stopTime - startTime);
+                return startY + (endY - startY) * progress;
+            }
 
-            const progress = (time - startTime) / (stopTime - startTime);
-            return startY + (endY - startY) * progress; // 等速進場
+            // 🏎️ 補償背景攀升：每秒向下移動約 8.2% 畫面高度
+            const driftRate = h * 0.082; 
+            return endY + (driftRate * (time - stopTime)); 
         }
     };
 })();
@@ -77,12 +77,11 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // --- 📏 自動縮放字體邏輯 ---
-        let fontSize = h * 0.09; // 預設大小
-        const maxContentHeight = h * 0.35; // 綠板最大容納高度
+        // 📏 選項 A：自動縮放字體
+        let fontSize = h * 0.09;
+        const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         
-        // 如果行數過多，縮小字體以確保不溢出
         if (lines.length * fontSize * 1.2 > maxContentHeight) {
             fontSize = maxContentHeight / (lines.length * 1.2);
         }
@@ -110,13 +109,12 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄製與分享邏輯
 async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
-        catch (err) { console.log("分享取消"); }
+        catch (err) { console.log("Share canceled"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -124,20 +122,13 @@ async function exportAndShare() {
     }
 }
 
-video.onended = () => {
-    if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-};
-
+video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
 document.getElementById('runBtn').onclick = () => { setup(); video.play(); render(); };
-
 document.getElementById('shareBtn').onclick = () => {
     setup();
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
-    mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm; codecs=vp9',
-        videoBitsPerSecond: 10000000 
-    });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 10000000 });
     mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
     mediaRecorder.onstop = exportAndShare;
     mediaRecorder.start();
