@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 最終精確對位版</title>
+    <title>NightST - 置中對位與顏色自訂版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -42,14 +42,17 @@
 </div>
 
 <script>
-// [FlipBoardModule]
+/**
+ * [FlipBoardModule] 模組化位置計算
+ * 根據使用者觀察，設定 0.8s 進場，2.4s 定格，4.1s 達到最佳抵消效果。
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startTime = 0.8;   // 🚩 根據觀察提前進場
-            const stopTime = 2.4;    
+            const startTime = 0.8; 
+            const stopTime = 2.4;  
             const startY = h * -0.2; 
-            const endY = h * 0.12;   
+            const endY = h * 0.18; // 🚩 因改為 Middle 對齊，數值微調以維持在綠板上半部
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -57,7 +60,7 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 🏎️ 補償係數微調至 0.096，鎖定 4.1 秒的最佳位置
+            // 🏎️ 動態補償：抵消鏡頭上移
             const driftRate = h * 0.096; 
             return endY + (driftRate * (time - stopTime)); 
         }
@@ -89,7 +92,7 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 自動縮放字體
+        // 字體大小與行數邏輯
         let fontSize = h * 0.09;
         const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -100,14 +103,18 @@ function render() {
 
         ctx.fillStyle = chosenColor; 
         ctx.textAlign = "center";
-        ctx.textBaseline = "top"; 
+        ctx.textBaseline = "middle"; // 🚩 核心改變：置中對齊
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = chosenColor;
         ctx.shadowBlur = 15;
 
         const lineHeight = fontSize * 1.2; 
+        // 🧮 計算多行偏移，使整組文字垂直居中於 currentY
+        const totalHeight = (lines.length - 1) * lineHeight;
+        const initialOffset = -totalHeight / 2;
+
         lines.forEach((line, index) => {
-            ctx.fillText(line, w / 2, currentY + (index * lineHeight));
+            ctx.fillText(line, w / 2, currentY + initialOffset + (index * lineHeight));
         });
         ctx.restore();
     }
@@ -121,10 +128,13 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 錄影分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
-    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+    const types = ["video/mp4", "video/webm"];
+    const mimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/mp4";
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const file = new File([blob], "NightST_Export.mp4", { type: mimeType });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
         catch (err) { triggerDownload(blob); }
@@ -152,7 +162,7 @@ document.getElementById('shareBtn').onclick = () => {
         mediaRecorder.start();
         video.play();
         render();
-    } catch (e) { alert("錄製失敗"); }
+    } catch (e) { alert("錄製啟動失敗"); }
 };
 
 function setup() {
