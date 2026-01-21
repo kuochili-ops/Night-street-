@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致高度與錄製修正版</title>
+    <title>NightST - 極致拉高與錄影修復</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -29,7 +29,7 @@
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
     <div class="btn-group">
-        <button id="runBtn">預覽效果</button>
+        <button id="runBtn">預覽</button>
         <button id="shareBtn">錄製並分享 🎬</button>
     </div>
 </div>
@@ -37,12 +37,12 @@
 <script>
 /**
  * [FlipBoardModule] 
- * startY 從 -0.05 再次大幅拉高至 -0.12
+ * startY 再拉高至 -0.25
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.12; // 🚩 極致高度：從畫面更上方滑入
+            const startY = h * -0.25; // 🚀 起點極致拉高：文字幾乎完全從上方降下
             const endY = h * 0.28;   
             if (time < 1.4) return startY;
             if (time > 4.0) return endY; 
@@ -80,7 +80,7 @@ function render() {
         const fontSize = h * 0.10; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 20;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25; 
@@ -96,7 +96,7 @@ function render() {
         const imgW = w * imgScale;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
         const padding = 20;
-        ctx.globalAlpha = Math.min(1, (time - 3.0) * 1.5);
+        ctx.globalAlpha = Math.min(1, (time - 3.0) * 2);
         ctx.drawImage(cornerImg, w - imgW - padding, h - imgH - padding, imgW, imgH);
         ctx.restore();
     }
@@ -105,23 +105,24 @@ function render() {
 }
 
 async function exportAndShare() {
-    if (recordedChunks.length === 0) {
-        console.error("無錄製數據");
-        return;
-    }
+    if (recordedChunks.length === 0) return;
     
+    // 確保錄製格式對行動裝置友好
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "MyNightScene.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 作品' });
-        } catch (err) { console.warn("分享取消"); }
+            await navigator.share({
+                files: [file],
+                title: 'NightST 影片分享',
+                text: '這是我合成的高品質影片！'
+            });
+        } catch (err) { console.warn("Share Cancelled"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = 'NightST_Export.mp4'; a.click();
-        URL.revokeObjectURL(url);
     }
     recordedChunks = [];
 }
@@ -142,16 +143,13 @@ document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
     recordedChunks = [];
     
-    // 🎥 針對 iOS 修復錄影流
+    // 🛠️ 錄製功能補強
     const stream = canvas.captureStream(30); 
-    
-    // 自動尋找支援的格式
-    const supportedTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-    let selectedType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type));
+    const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
 
     try {
         mediaRecorder = new MediaRecorder(stream, {
-            mimeType: selectedType,
+            mimeType: mimeType,
             videoBitsPerSecond: 10000000 
         });
 
@@ -160,12 +158,12 @@ document.getElementById('shareBtn').onclick = () => {
         };
         mediaRecorder.onstop = exportAndShare;
         
-        // 🚀 設定每 1000ms 切片一次，避免數據遺失
-        mediaRecorder.start(1000); 
+        // 🚀 強迫每 100 毫秒儲存一次區塊，防止手機端數據遺失
+        mediaRecorder.start(100); 
         video.play();
         render();
     } catch (e) {
-        alert("此瀏覽器環境暫不支援高品質錄製");
+        alert("瀏覽器錄製功能異常，請更換 Safari 或 Chrome 試試看！");
     }
 };
 
