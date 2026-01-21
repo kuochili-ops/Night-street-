@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 高位死鎖靜止版</title>
+    <title>NightST - 座標絕對死鎖版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -12,11 +12,11 @@
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; }
-        input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; outline: none; }
+        input[type="text"] { flex: 1; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; font-size: 16px; outline: none; }
         input[type="color"] { width: 50px; height: 52px; border: 1px solid #333; background: #1a1a1a; cursor: pointer; border-radius: 8px; }
-        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; }
+        button { flex: 1; padding: 16px; font-weight: bold; border: none; cursor: pointer; border-radius: 8px; font-size: 16px; transition: all 0.2s; }
         #runBtn { background: #333; color: #eee; }
-        #shareBtn { background: var(--accent); color: #000; }
+        #shareBtn { background: var(--accent); color: #000; box-shadow: 0 4px 14px rgba(0, 255, 136, 0.3); }
     </style>
 </head>
 <body>
@@ -31,23 +31,24 @@
         <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
         <input type="color" id="textColor" value="#00ff88">
     </div>
-    <div class="btn-group" style="display:flex; gap:10px;">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製分享</button>
+    <div class="btn-group">
+        <button id="runBtn">預覽效果</button>
+        <button id="shareBtn">錄製分享 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 核心：座標永久固定在 -0.15，不隨時間改變。
- * 這會讓文字產生「在那裡等著被畫面拍到」的物理質感。
+ * 這裡我們使用絕對死鎖邏輯。
+ * 文字座標永遠固定在一個高位，直到影片畫面（背景）升上來。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 將字提到更高位置 (-0.15)，確保開場只露出一點點或完全不露。
-            // 並且移除了所有隨時間位移的判斷，字永遠釘在這裡。
+            // 🚩 你提到的鎖定在 -10 或 -15 
+            // 這裡使用 h * -0.15 (即高度的 -15%)，字會完全藏在外面，
+            // 隨鏡頭上升，字會從下往上被「刷」出來。
             return h * -0.15; 
         }
     };
@@ -76,6 +77,7 @@ function render() {
 
     if (signText) {
         ctx.save();
+        // 取得死鎖座標
         const currentY = FlipBoardModule.getY(h, time);
         
         ctx.fillStyle = selectedColor;
@@ -83,19 +85,22 @@ function render() {
         ctx.textBaseline = "top";
         const fontSize = h * 0.10;
         ctx.font = `900 ${fontSize}px sans-serif`;
+        
+        // 增強發光感
         ctx.shadowColor = selectedColor;
         ctx.shadowBlur = 25;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
 
-        // 座標固定不動，文字會隨著影片背景上升而自然顯現完整
+        // 因為座標是負值，Canvas 會自動隱藏畫面外的部分
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
         ctx.restore();
     }
 
+    // 右下角角落圖標
     if (time >= 3.0) {
         ctx.save();
         const imgW = w * 0.25;
@@ -107,10 +112,11 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 錄製與分享邏輯
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Fixed.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Fixed_Final.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
