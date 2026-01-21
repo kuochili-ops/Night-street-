@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 深度負值絕對死鎖版</title>
+    <title>NightST - 綠板同步定位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -41,15 +41,22 @@
 <script>
 /**
  * [FlipBoardModule]
- * 絕對死鎖邏輯：
- * 使用大的負值 (-0.35) 確保開場完全看不見字。
+ * 核心：隨時間從下往上「攀爬」，抵銷畫面上升感。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 鎖定在 -0.35。這是一個「大的負值」。
-            // 字在那裡等著，直到背景綠板升上來「接住」它。
-            return h * -0.35; 
+            const startY = h * 0.65; // 開場位置（隨綠板出現在下方）
+            const endY = h * 0.10;   // 最終定位點（綠板上部）
+
+            // 0s 到 3.1s：字跟著畫面一起往上跑，達成「相對靜止」
+            if (time < 3.1) {
+                const progress = time / 3.1;
+                return startY + (endY - startY) * progress;
+            }
+
+            // 3.1s 之後：畫面停了，字也死鎖在原地不動
+            return endY;
         }
     };
 })();
@@ -90,7 +97,6 @@ function render() {
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         const lineHeight = fontSize * 1.25;
 
-        // 字完全不動，等畫面。
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -130,7 +136,7 @@ document.getElementById('shareBtn').onclick = () => {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_LargeNegative.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Sync.mp4", { type: 'video/mp4' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: 'NightST' }); } catch (err) {}
     } else {
