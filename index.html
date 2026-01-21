@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 視覺錨點修正版</title>
+    <title>NightST - 視覺穩定最終版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
@@ -42,32 +42,22 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 核心修正：加入動態座標補償 (Motion Compensation)
- * 模擬文字「貼」在向上攀爬的畫面中
+ * 修正說明：文字改在 3.0s (畫面停止攀升後) 才出現
+ * 徹底消除跟著畫面向上飛的誇張感
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            // 🚩 初始位置：在燈管下方
-            const startY = h * -0.15; 
-            // 📍 終點位置：綠板中央
-            const endY = h * 0.28;   
+            const startY = h * 0.05; // 🚩 文字出現就在綠板頂部
+            const endY = h * 0.28;   // 📍 終點在綠板中央
+            
+            // 延後到 3.0s 才顯示文字位移邏輯
+            if (time < 3.0) return startY; 
+            if (time >= 5.0) return endY; 
 
-            // 🛠️ 階段 1：畫面攀升期 (1.4s - 3.1s)
-            // 為了讓文字看起來「固定」在向上動的畫面上，文字的 Y 座標必須跟著變小
-            if (time < 3.1) {
-                const climbProgress = (time - 1.4) / 1.7;
-                const compensation = h * 0.12 * climbProgress; // 補償畫面攀升的距離
-                return startY - compensation; 
-            }
-
-            // 🛠️ 階段 2：畫面穩定後開始滑動 (3.1s - 5.0s)
-            const postClimbY = startY - (h * 0.12); // 攀升結束後的相對高度
-            if (time >= 5.0) return endY;
-
-            const slideT = (time - 3.1) / 1.9;
-            const easeOut = 1 - Math.pow(1 - slideT, 3); // 更有質感的滑落
-            return postClimbY + (endY - postClimbY) * easeOut;
+            const t = (time - 3.0) / 2.0; 
+            const easeOut = 1 - Math.pow(1 - t, 3); // 平滑下滑
+            return startY + (endY - startY) * easeOut;
         }
     };
 })();
@@ -93,7 +83,8 @@ function render() {
     const signText = signInput.value;
     const selectedColor = colorInput.value;
 
-    if (signText && time > 1.4) {
+    // 🚩 只有在 3.0s 畫面穩定的時候才讓文字出現
+    if (signText && time > 3.0) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
@@ -107,7 +98,7 @@ function render() {
         ctx.shadowBlur = 20;
         
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
-        const lineHeight = fontSize * 1.2; 
+        const lineHeight = fontSize * 1.25; 
         lines.forEach((line, index) => {
             ctx.fillText(line, w / 2, currentY + (index * lineHeight));
         });
@@ -129,16 +120,16 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Final.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Stable.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'NightST 創作分享' });
+            await navigator.share({ files: [file], title: 'NightST 創作' });
         } catch (err) { console.log("Share skipped"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'NightST_Final.mp4'; a.click();
+        a.href = url; a.download = 'NightST_Stable.mp4'; a.click();
     }
 }
 
