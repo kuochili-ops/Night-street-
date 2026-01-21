@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 置中對位與顏色自訂版</title>
+    <title>NightST - 同步煞車最終對位版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,16 +43,17 @@
 
 <script>
 /**
- * [FlipBoardModule] 模組化位置計算
- * 根據使用者觀察，設定 0.8s 進場，2.4s 定格，4.1s 達到最佳抵消效果。
+ * [FlipBoardModule] 
+ * 更新：加入煞車點 (endTime)，確保文字隨背景同步靜止。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
             const stopTime = 2.4;  
+            const endTime = 4.2;   // 🚩 畫面停止上移的時間點
             const startY = h * -0.2; 
-            const endY = h * 0.18; // 🚩 因改為 Middle 對齊，數值微調以維持在綠板上半部
+            const endY = h * 0.18; 
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -60,9 +61,12 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 🏎️ 動態補償：抵消鏡頭上移
+            // 🏎️ 動態補償階段
             const driftRate = h * 0.096; 
-            return endY + (driftRate * (time - stopTime)); 
+            // 🛑 使用 Math.min 鎖定補償時間，超過 4.2 秒就不再增加數值
+            const effectiveDriftTime = Math.min(time, endTime) - stopTime;
+            
+            return endY + (driftRate * effectiveDriftTime); 
         }
     };
 })();
@@ -92,7 +96,6 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
-        // 字體大小與行數邏輯
         let fontSize = h * 0.09;
         const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -103,13 +106,12 @@ function render() {
 
         ctx.fillStyle = chosenColor; 
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle"; // 🚩 核心改變：置中對齊
+        ctx.textBaseline = "middle"; 
         ctx.font = `900 ${fontSize}px sans-serif`;
         ctx.shadowColor = chosenColor;
         ctx.shadowBlur = 15;
 
         const lineHeight = fontSize * 1.2; 
-        // 🧮 計算多行偏移，使整組文字垂直居中於 currentY
         const totalHeight = (lines.length - 1) * lineHeight;
         const initialOffset = -totalHeight / 2;
 
@@ -128,7 +130,6 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 錄影分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const types = ["video/mp4", "video/webm"];
@@ -162,7 +163,7 @@ document.getElementById('shareBtn').onclick = () => {
         mediaRecorder.start();
         video.play();
         render();
-    } catch (e) { alert("錄製啟動失敗"); }
+    } catch (e) { alert("錄製失敗"); }
 };
 
 function setup() {
