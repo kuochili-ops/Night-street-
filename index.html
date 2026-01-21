@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NightST - 極致拉高與錄影修復</title>
+    <title>NightST - 平滑動態優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
-        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; border-radius: 8px; }
         canvas, video { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
@@ -29,7 +29,7 @@
 <div class="controls">
     <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
+        <button id="runBtn">預覽效果</button>
         <button id="shareBtn">錄製並分享 🎬</button>
     </div>
 </div>
@@ -37,17 +37,25 @@
 <script>
 /**
  * [FlipBoardModule] 
- * startY 再拉高至 -0.25
+ * 修正「先下再上」的問題：使用平滑緩動 (Ease-Out)
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.25; // 🚀 起點極致拉高：文字幾乎完全從上方降下
+            const startY = h * -0.25; 
             const endY = h * 0.28;   
+            
             if (time < 1.4) return startY;
-            if (time > 4.0) return endY; 
-            const progress = (time - 1.4) / 2.6; 
-            return startY + (endY - startY) * progress;
+            if (time >= 4.5) return endY; // 稍微延長一點點總時間確保穩定
+
+            // 計算進度 (0 到 1)
+            let t = (time - 1.4) / 3.1; 
+            
+            // 使用 Ease-Out Quadratic 緩動公式：1 - (1 - t) * (1 - t)
+            // 這能確保文字快到終點時是慢慢停下的，不會有反彈感
+            const easeOut = 1 - (1 - t) * (1 - t);
+            
+            return startY + (endY - startY) * easeOut;
         }
     };
 })();
@@ -92,8 +100,7 @@ function render() {
 
     if (time >= 3.0) {
         ctx.save();
-        const imgScale = 0.25;
-        const imgW = w * imgScale;
+        const imgW = w * 0.25;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
         const padding = 20;
         ctx.globalAlpha = Math.min(1, (time - 3.0) * 2);
@@ -104,21 +111,16 @@ function render() {
     requestAnimationFrame(render);
 }
 
+// 📤 分享功能
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
-    
-    // 確保錄製格式對行動裝置友好
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
+    const file = new File([blob], "NightST_Video.mp4", { type: 'video/mp4' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-            await navigator.share({
-                files: [file],
-                title: 'NightST 影片分享',
-                text: '這是我合成的高品質影片！'
-            });
-        } catch (err) { console.warn("Share Cancelled"); }
+            await navigator.share({ files: [file], title: 'NightST 分享' });
+        } catch (err) { console.log("Share failed"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -142,29 +144,18 @@ document.getElementById('runBtn').onclick = () => {
 document.getElementById('shareBtn').onclick = () => {
     prepareCanvas();
     recordedChunks = [];
-    
-    // 🛠️ 錄製功能補強
     const stream = canvas.captureStream(30); 
     const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
 
-    try {
-        mediaRecorder = new MediaRecorder(stream, {
-            mimeType: mimeType,
-            videoBitsPerSecond: 10000000 
-        });
-
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-        mediaRecorder.onstop = exportAndShare;
-        
-        // 🚀 強迫每 100 毫秒儲存一次區塊，防止手機端數據遺失
-        mediaRecorder.start(100); 
-        video.play();
-        render();
-    } catch (e) {
-        alert("瀏覽器錄製功能異常，請更換 Safari 或 Chrome 試試看！");
-    }
+    mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 10000000 
+    });
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = exportAndShare;
+    mediaRecorder.start(100); 
+    video.play();
+    render();
 };
 
 function prepareCanvas() {
