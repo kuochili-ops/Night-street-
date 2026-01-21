@@ -2,12 +2,13 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 高品質錄製與分享版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightST - 穩定錄製與位置優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
         .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; border-radius: 8px; }
-        canvas, video { position: absolute; width: 100%; height: 100%; }
+        canvas, video { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
         input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; }
@@ -35,13 +36,13 @@
 
 <script>
 /**
- * [FlipBoardModule] 處理文字動態軌跡
- * 優化點：startY 收斂至 -0.20，結束時間提前至 4.0s 以增加穩定性
+ * [FlipBoardModule] 文字位置優化
+ * startY 設為 0.15，讓文字在出現時就接近綠板中間位置
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
-            const startY = h * -0.20; 
+            const startY = h * 0.15; // 🚀 調整至綠板中間高度
             const endY = h * 0.28; 
             if (time < 1.4) return startY;
             if (time > 4.0) return endY; 
@@ -55,12 +56,9 @@ const video = document.getElementById('mainVideo');
 const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
 const signInput = document.getElementById('signText');
-
-// 🖼️ 預載資源
 const cornerImg = new Image();
 cornerImg.src = 'IMG_6604.png'; 
 
-// 🎥 錄製相關變數
 let mediaRecorder;
 let recordedChunks = [];
 
@@ -73,7 +71,6 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
 
-    // 🟢 繪製綠板文字
     if (signText && time > 1.4) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
@@ -93,7 +90,6 @@ function render() {
         ctx.restore();
     }
 
-    // 🖼️ 繪製右下角圖片 (3.0s 出現)
     if (time >= 3.0) {
         ctx.save();
         const imgW = w * 0.25;
@@ -106,15 +102,17 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// 📤 分享邏輯
+// 修正後的錄製匯出與分享邏輯
 async function exportAndShare() {
+    if (recordedChunks.length === 0) return;
+    
     const blob = new Blob(recordedChunks, { type: 'video/mp4' });
     const file = new File([blob], "NightST_Export.mp4", { type: 'video/mp4' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
             await navigator.share({ files: [file], title: 'NightST 影片分享' });
-        } catch (err) { console.log("分享取消"); }
+        } catch (err) { console.log("分享已取消"); }
     } else {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -122,14 +120,12 @@ async function exportAndShare() {
     }
 }
 
-// 🎬 自動化錄製監控
 video.onended = () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
     }
 };
 
-// 🔘 按鈕事件
 document.getElementById('runBtn').onclick = () => {
     initCanvas();
     video.play();
@@ -140,13 +136,19 @@ document.getElementById('shareBtn').onclick = () => {
     initCanvas();
     recordedChunks = [];
     
-    // 🎥 設定 30fps 高品質錄製
+    // 💡 修正：自動偵測支援的錄製格式，提升手機相容性
+    let options = { videoBitsPerSecond: 8000000 };
+    if (MediaRecorder.isTypeSupported('video/mp4')) {
+        options.mimeType = 'video/mp4';
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+        options.mimeType = 'video/webm;codecs=vp9';
+    }
+
     const stream = canvas.captureStream(30);
-    mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm; codecs=vp9',
-        videoBitsPerSecond: 10000000 
-    });
-    mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+    mediaRecorder = new MediaRecorder(stream, options);
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+    };
     mediaRecorder.onstop = exportAndShare;
     
     mediaRecorder.start();
