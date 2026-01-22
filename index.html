@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 5.3s 絕對鎖死最終版</title>
+    <title>NightST - 線性一致鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,35 +37,32 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 5.3s 鎖死版
- * 提高起始點，並延長 Y 值累加時間至 5.3 秒。
+ * [FlipBoardModule] 
+ * 0.8秒到5.3秒採用一致的 y 累加計算方式。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const stopTime = 2.4;  
-            const endTime = 5.3;   // 🚩 延長至 5.3 秒停止計算
+            const endTime = 5.3;   // 計算持續至 5.3s
             const startY = h * -0.2; 
-            const endY = h * 0.18; // 🚩 起始位置調高
+            
+            // 🚩 一致的移動斜率：從進場到結束採用相同的下移速率
+            // 設定總位移，確保 5.3s 時字體在綠板中心 (約 0.55h 的位置)
+            const totalTravel = h * 0.75; 
+            const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
-            if (time <= stopTime) {
-                const progress = (time - startTime) / (stopTime - startTime);
-                return startY + (endY - startY) * progress;
-            }
-
-            // 🚩 調整後的補償速率，確保 5.3s 時文字位於中心
-            const driftRate = h * 0.125; 
-            const effectiveDriftTime = Math.min(time, endTime) - stopTime;
             
-            return endY + (driftRate * effectiveDriftTime); 
+            // 🚩 計算當前累加值
+            const effectiveTime = Math.min(time, endTime) - startTime;
+            return startY + (speed * effectiveTime);
         }
     };
 })();
@@ -129,7 +126,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_5.3s_Locked.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Linear_Consistent.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
