@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對鎖死 5.1s 強化版</title>
+    <title>NightST - 視覺鎖死調試版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,19 +43,18 @@
 
 <script>
 /**
- * [FlipBoardModule] 
- * 根據最新微調：0.8s - 5.1s，位移總量 0.9h。
- * 這會提供最強的視覺下壓感。
+ * [FlipBoardModule]
+ * 嘗試新組合：0.8s - 5.15s，位移總量 0.92h。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.1;   // 🚩 鎖定於 5.1s 結束
+            const endTime = 5.15;  // 🚩 設定於 5.15s 停止計算
             const startY = h * -0.2; 
             
-            // 🚩 速率設定：0.9h，在較短時間內完成位移
-            const totalTravel = h * 0.9; 
+            // 🚩 速率微調：0.92h
+            const totalTravel = h * 0.92; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -125,7 +124,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_0.9h_5.1s_Locked.mp4'; a.click();
+    a.href = url; a.download = 'NightST_0.92h_5.15s.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
