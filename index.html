@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對鎖死最終調校</title>
+    <title>NightST - 絕對鎖死最終微調</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -44,18 +44,18 @@
 <script>
 /**
  * [FlipBoardModule] 
- * 0.8s 到 5.1s 採用一致的 y 累加計算。
- * 提升速率 (0.76h) 並提早結束 (5.1s) 以達成絕對鎖死。
+ * 0.8s 到 5.0s 採用強化的單一速率累加。
+ * 再微加快速率 (0.785h) 並更早結束 (5.0s) 以達成絕對對位。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.1;   // 🚩 提早至 5.1s 結束移動
+            const endTime = 5.0;   // 🚩 提早至 5.0s 結束，避免結尾浮動
             const startY = h * -0.2; 
             
-            // 🚩 加快移動速率：從 0.74h 提升至 0.76h
-            const totalTravel = h * 0.76; 
+            // 🚩 再次加強移動速率：從 0.76h 提升至 0.785h
+            const totalTravel = h * 0.785; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -125,7 +125,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Final_Locked.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Locked_V3.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
