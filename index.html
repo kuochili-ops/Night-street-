@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 五秒後極放緩版</title>
+    <title>NightST - 絕對靜止鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,33 +43,27 @@
 
 <script>
 /**
- * [FlipBoardModule] 
- * 1. 0.8s - 5.0s: 提高速率 (0.92h) 並稍微提早結束主移動。
- * 2. 5.0s 之後: 速度降至 2%，實現極細微的「放緩不全停」。
+ * [FlipBoardModule] 絕對靜止鎖死邏輯
+ * 解決問題：防止影片靜止後文字繼續下移。
+ * 1. 結束時間點：提早到 5.0s，確保在背景停穩前文字先停。
+ * 2. 移動速度：維持 0.9h 的高咬合率。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const midTime = 5.0;    // 🚩 提前至 5.0s 切換
+            const endTime = 5.0;    // 🚩 提早至 5.0s 徹底停止
             const startY = h * -0.2; 
             
-            // 第一階段主速率微調至 0.92h
-            const totalTravelMain = h * 0.92; 
-            const mainSpeed = totalTravelMain / (midTime - startTime);
-            
-            // 第二階段極低速 (改為 2% 幾乎黏著)
-            const slowSpeed = mainSpeed * 0.02; 
+            // 🚩 速率設定：0.9h
+            const totalTravel = h * 0.9; 
+            const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
             
-            if (time <= midTime) {
-                return startY + (mainSpeed * (time - startTime));
-            } else {
-                const yAtMid = startY + (mainSpeed * (midTime - startTime));
-                const slowTime = time - midTime;
-                return yAtMid + (slowSpeed * slowTime);
-            }
+            // 🚩 關鍵：5.0s 之後時間不再增加，y 值絕對固定
+            const effectiveTime = Math.min(time, endTime) - startTime;
+            return startY + (speed * effectiveTime);
         }
     };
 })();
@@ -133,7 +127,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Buffer_5.0s_0.92h.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Absolute_Static.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
