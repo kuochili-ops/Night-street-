@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 還原穩定版</title>
+    <title>NightST - 固定速率鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -14,7 +14,7 @@
         .label-text { font-size: 14px; color: #888; white-space: nowrap; min-width: 100px; }
         input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; }
         #signText { flex-grow: 1; }
-        #endTimeInput { width: 100px; text-align: center; color: var(--accent); font-weight: bold; }
+        #speedInput, #endTimeInput { width: 90px; text-align: center; color: var(--accent); font-weight: bold; }
         .color-group { display: flex; align-items: center; gap: 8px; background: #222; padding: 5px 12px; border-radius: 5px; border: 1px solid #444; }
         input[type="color"] { border: none; width: 30px; height: 30px; cursor: pointer; background: none; padding: 0; }
         .btn-group { display: flex; gap: 10px; margin-top: 5px; }
@@ -40,37 +40,37 @@
     </div>
     
     <div class="input-row">
-        <span class="label-text">停止時間 (秒):</span>
+        <span class="label-text">移動速率 (h/s):</span>
+        <input type="text" id="speedInput" value="0.214">
+        <span class="label-text" style="margin-left:10px;">停止時間 (秒):</span>
         <input type="text" id="endTimeInput" value="5.1">
-        <span style="color: #666; font-size: 12px;">* 建議 5.0 - 5.2 達成絕對鎖死</span>
     </div>
+    <div style="font-size: 12px; color: #666;">* 速率 0.214 約等於原本 4.2 秒走 0.9h。速率不變時，停止時間越晚，位置越低。</div>
 
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 還原核心位移邏輯
- * 1. 起始點：h * -0.2 (看板上方)
- * 2. 總位移：h * 0.9 (強力咬合)
+ * [FlipBoardModule] 固定速率邏輯
+ * getY 不再管終點在哪，只根據時間與速度計算當前位置。
  */
 const FlipBoardModule = (() => {
     return {
-        getY: (h, time, userEndTime) => {
+        getY: (h, time, userSpeed, userEndTime) => {
             const startTime = 0.8; 
             const endTime = userEndTime; 
-            const startY = h * -0.2; // 🚩 還原為原始起始點
+            const startY = h * -0.2; 
             
-            // 🚩 還原位移總量 0.9h
-            const totalTravel = h * 0.9; 
-            const speed = totalTravel / (endTime - startTime);
+            // 🚩 速度改由用戶決定 (每秒移動畫布高度的幾倍)
+            const speed = h * userSpeed;
 
             if (time < startTime) return startY;
             
-            // 絕對鎖死邏輯：到點即停
+            // 🚩 鎖死邏輯：只計算到 endTime 為止的位移
             const effectiveTime = Math.min(time, endTime) - startTime;
             return startY + (speed * effectiveTime);
         }
@@ -82,6 +82,7 @@ const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
 const signInput = document.getElementById('signText');
 const colorInput = document.getElementById('textColor');
+const speedInput = document.getElementById('speedInput');
 const endTimeInput = document.getElementById('endTimeInput');
 const cornerImg = new Image();
 cornerImg.src = 'IMG_6604.png'; 
@@ -98,11 +99,14 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
     const chosenColor = colorInput.value;
+    
+    // 獲取自定義參數
+    const userSpeed = parseFloat(speedInput.value) || 0.214;
     const userEnd = parseFloat(endTimeInput.value) || 5.1;
 
     if (signText && time >= 0.8) {
         ctx.save();
-        const currentY = FlipBoardModule.getY(h, time, userEnd);
+        const currentY = FlipBoardModule.getY(h, time, userSpeed, userEnd);
         
         let fontSize = h * 0.09;
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -138,7 +142,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `NightST_Final_Lock_${endTimeInput.value}.mp4`; a.click();
+    a.href = url; a.download = `NightST_Spd${speedInput.value}_End${endTimeInput.value}.mp4`; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
