@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 視覺同步最終版</title>
+    <title>NightST - 絕對鎖死增強版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,25 +37,25 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule] 
- * 0.8s 到 5.2s 採用修正後的單一速率累加。
- * 透過微調 totalTravel 解決末端下掉問題。
+ * 0.8s 到 5.2s 採用單一速率累加。
+ * 微增速度以徹底消除文字上移感。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.2;   // 5.2秒計算結束，字不再往下動
+            const endTime = 5.2;   
             const startY = h * -0.2; 
             
-            // 🚩 微調總位移：從 0.75h 降至 0.725h，抵銷畫面上移速度
-            const totalTravel = h * 0.725; 
+            // 🚩 速率微增：從 0.725h 增加至 0.74h
+            const totalTravel = h * 0.74; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -125,7 +125,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Perfect_Sync.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Locked_V2.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
