@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 極致平滑鎖定</title>
+    <title>NightST - 五秒後極放緩版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,30 +43,29 @@
 
 <script>
 /**
- * [FlipBoardModule] 二段速邏輯調優
- * - 0.8s - 5.1s: 主速位移 (0.9h)。
- * - 5.1s 之後: 速度切換至原本的 3%，實現極細微緩動而非全停。
+ * [FlipBoardModule] 
+ * 1. 0.8s - 5.0s: 提高速率 (0.92h) 並稍微提早結束主移動。
+ * 2. 5.0s 之後: 速度降至 2%，實現極細微的「放緩不全停」。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const midTime = 5.1;    
+            const midTime = 5.0;    // 🚩 提前至 5.0s 切換
             const startY = h * -0.2; 
             
-            // 第一階段主速度
-            const totalTravelMain = h * 0.9; 
+            // 第一階段主速率微調至 0.92h
+            const totalTravelMain = h * 0.92; 
             const mainSpeed = totalTravelMain / (midTime - startTime);
             
-            // 第二階段極低速 (改為 3% 更細膩)
-            const slowSpeed = mainSpeed * 0.03; 
+            // 第二階段極低速 (改為 2% 幾乎黏著)
+            const slowSpeed = mainSpeed * 0.02; 
 
             if (time < startTime) return startY;
             
             if (time <= midTime) {
                 return startY + (mainSpeed * (time - startTime));
             } else {
-                // 5.1秒後不停止，持續緩動直到影片結束
                 const yAtMid = startY + (mainSpeed * (midTime - startTime));
                 const slowTime = time - midTime;
                 return yAtMid + (slowSpeed * slowTime);
@@ -134,7 +133,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Smooth_Lock.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Buffer_5.0s_0.92h.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
