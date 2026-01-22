@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 位置上移鎖死版</title>
+    <title>NightST - 自定義起始位置</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -11,9 +11,12 @@
         #mainVideo { display: none; }
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; align-items: center; }
-        input[type="text"] { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; flex-grow: 1; }
+        .label-text { font-size: 14px; color: #888; white-space: nowrap; }
+        input { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; }
+        #signText { flex-grow: 2; }
+        #yPosInput { width: 80px; text-align: center; color: var(--accent); }
         .color-group { display: flex; align-items: center; gap: 8px; background: #222; padding: 5px 12px; border-radius: 5px; border: 1px solid #444; }
-        input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; background: none; }
+        input[type="color"] { border: none; width: 30px; height: 30px; cursor: pointer; background: none; padding: 0; }
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 15px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
         #runBtn { background: #444; color: #fff; }
@@ -29,33 +32,40 @@
 
 <div class="controls">
     <div class="input-row">
+        <span class="label-text">文字內容:</span>
         <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
         <div class="color-group">
-            <label style="font-size: 12px;">顏色</label>
             <input type="color" id="textColor" value="#FF0000">
         </div>
     </div>
+    
+    <div class="input-row">
+        <span class="label-text">起始高度 (建議 -0.2 到 -0.8):</span>
+        <input type="text" id="yPosInput" value="-0.3" placeholder="-x">
+        <span style="color: #666; font-size: 12px;">* 負值越大，出現位置越高</span>
+    </div>
+
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 1. 調整 startY 至 -0.3h，讓出現位置更高。
- * 2. 調整 totalTravel 為 1.0h，補償起始點的改變，確保 5.0s 時的定格點不變。
+ * [FlipBoardModule]
+ * 動態計算 Y 軸，根據用戶輸入的 startY 調整路徑。
  */
 const FlipBoardModule = (() => {
     return {
-        getY: (h, time) => {
+        getY: (h, time, userStartY) => {
             const startTime = 0.8; 
-            const endTime = 5.0;    // 🚩 固定於 5.0s 停止
-            const startY = h * -0.3; // 🚩 上移起始出現位置
+            const endTime = 5.0;   // 🚩 鎖定於 5.0s
+            const startY = h * userStartY; 
             
-            // 🚩 總位移增加，以對應更高的起始點
-            const totalTravel = h * 1.0; 
+            // 🚩 自動調整位移總量，確保最終停在看板中心 (約 0.7h 的位置)
+            const targetY = h * 0.7; 
+            const totalTravel = targetY - startY;
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -71,6 +81,7 @@ const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
 const signInput = document.getElementById('signText');
 const colorInput = document.getElementById('textColor');
+const yPosInput = document.getElementById('yPosInput');
 const cornerImg = new Image();
 cornerImg.src = 'IMG_6604.png'; 
 
@@ -86,10 +97,12 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
     const chosenColor = colorInput.value;
+    // 獲取用戶輸入的 -x 值
+    const userY = parseFloat(yPosInput.value) || -0.3;
 
     if (signText && time >= 0.8) {
         ctx.save();
-        const currentY = FlipBoardModule.getY(h, time);
+        const currentY = FlipBoardModule.getY(h, time, userY);
         
         let fontSize = h * 0.09;
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -125,7 +138,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_High_Start_Locked.mp4'; a.click();
+    a.href = url; a.download = `NightST_Start_${yPosInput.value}.mp4`; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
