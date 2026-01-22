@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 五秒後放緩版</title>
+    <title>NightST - 極致平滑鎖定</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,37 +37,36 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製 🎬</button>
+        <button id="shareBtn">高品質錄製成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 二段速邏輯
- * 第一段 (0.8s - 5.1s): 快速移動以抵銷背景上移 (0.9h)。
- * 第二段 (5.1s+): 速度放慢至原本的 5%，與背景殘餘慣性同步。
+ * [FlipBoardModule] 二段速邏輯調優
+ * - 0.8s - 5.1s: 主速位移 (0.9h)。
+ * - 5.1s 之後: 速度切換至原本的 3%，實現極細微緩動而非全停。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const midTime = 5.1;    // 🚩 切換速度的轉折點
+            const midTime = 5.1;    
             const startY = h * -0.2; 
             
-            // 第一段主移動速度
+            // 第一階段主速度
             const totalTravelMain = h * 0.9; 
             const mainSpeed = totalTravelMain / (midTime - startTime);
             
-            // 第二段放慢速度 (主速度的 5%)
-            const slowSpeed = mainSpeed * 0.05; 
+            // 第二階段極低速 (改為 3% 更細膩)
+            const slowSpeed = mainSpeed * 0.03; 
 
             if (time < startTime) return startY;
             
             if (time <= midTime) {
-                // 第一段：正常抵銷移動
                 return startY + (mainSpeed * (time - startTime));
             } else {
-                // 第二段：5.1秒後速度放緩而非全停
+                // 5.1秒後不停止，持續緩動直到影片結束
                 const yAtMid = startY + (mainSpeed * (midTime - startTime));
                 const slowTime = time - midTime;
                 return yAtMid + (slowSpeed * slowTime);
@@ -135,7 +134,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Buffer_5.1s.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Smooth_Lock.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
