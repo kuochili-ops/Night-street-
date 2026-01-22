@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對靜止鎖死版</title>
+    <title>NightST - 位置上移鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,25 +43,23 @@
 
 <script>
 /**
- * [FlipBoardModule] 絕對靜止鎖死邏輯
- * 解決問題：防止影片靜止後文字繼續下移。
- * 1. 結束時間點：提早到 5.0s，確保在背景停穩前文字先停。
- * 2. 移動速度：維持 0.9h 的高咬合率。
+ * [FlipBoardModule] 
+ * 1. 調整 startY 至 -0.3h，讓出現位置更高。
+ * 2. 調整 totalTravel 為 1.0h，補償起始點的改變，確保 5.0s 時的定格點不變。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.0;    // 🚩 提早至 5.0s 徹底停止
-            const startY = h * -0.2; 
+            const endTime = 5.0;    // 🚩 固定於 5.0s 停止
+            const startY = h * -0.3; // 🚩 上移起始出現位置
             
-            // 🚩 速率設定：0.9h
-            const totalTravel = h * 0.9; 
+            // 🚩 總位移增加，以對應更高的起始點
+            const totalTravel = h * 1.0; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
             
-            // 🚩 關鍵：5.0s 之後時間不再增加，y 值絕對固定
             const effectiveTime = Math.min(time, endTime) - startTime;
             return startY + (speed * effectiveTime);
         }
@@ -127,7 +125,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Absolute_Static.mp4'; a.click();
+    a.href = url; a.download = 'NightST_High_Start_Locked.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
