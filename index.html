@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對鎖死最終微調</title>
+    <title>NightST - 絕對鎖死定稿版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,25 +37,25 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 0.8s 到 5.0s 採用強化的單一速率累加。
- * 再微加快速率 (0.785h) 並更早結束 (5.0s) 以達成絕對對位。
+ * [FlipBoardModule] 絕對鎖死定稿邏輯
+ * 1. 調整位移速率 (0.80h) 以完美咬合畫面上移速度。
+ * 2. 結束時間微調至 4.95s，實現絕對鎖定。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.0;   // 🚩 提早至 5.0s 結束，避免結尾浮動
+            const endTime = 4.95;   // 🚩 提早至 4.95s 結束
             const startY = h * -0.2; 
             
-            // 🚩 再次加強移動速率：從 0.76h 提升至 0.785h
-            const totalTravel = h * 0.785; 
+            // 🚩 再次微調速率：從 0.785h 提升至 0.80h
+            const totalTravel = h * 0.80; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -125,7 +125,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Locked_V3.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Final_Absolute_Locked.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
@@ -135,7 +135,7 @@ document.getElementById('shareBtn').onclick = () => {
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
     try {
-        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 8000000 });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 10000000 }); // 提高碼率至 10M
         mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
         mediaRecorder.onstop = exportAndShare;
         mediaRecorder.start();
