@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 視覺鎖死調試版</title>
+    <title>NightST - 五秒後放緩版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,24 +43,35 @@
 
 <script>
 /**
- * [FlipBoardModule]
- * 嘗試新組合：0.8s - 5.15s，位移總量 0.92h。
+ * [FlipBoardModule] 二段速邏輯
+ * 第一段 (0.8s - 5.1s): 快速移動以抵銷背景上移 (0.9h)。
+ * 第二段 (5.1s+): 速度放慢至原本的 5%，與背景殘餘慣性同步。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.15;  // 🚩 設定於 5.15s 停止計算
+            const midTime = 5.1;    // 🚩 切換速度的轉折點
             const startY = h * -0.2; 
             
-            // 🚩 速率微調：0.92h
-            const totalTravel = h * 0.92; 
-            const speed = totalTravel / (endTime - startTime);
+            // 第一段主移動速度
+            const totalTravelMain = h * 0.9; 
+            const mainSpeed = totalTravelMain / (midTime - startTime);
+            
+            // 第二段放慢速度 (主速度的 5%)
+            const slowSpeed = mainSpeed * 0.05; 
 
             if (time < startTime) return startY;
             
-            const effectiveTime = Math.min(time, endTime) - startTime;
-            return startY + (speed * effectiveTime);
+            if (time <= midTime) {
+                // 第一段：正常抵銷移動
+                return startY + (mainSpeed * (time - startTime));
+            } else {
+                // 第二段：5.1秒後速度放緩而非全停
+                const yAtMid = startY + (mainSpeed * (midTime - startTime));
+                const slowTime = time - midTime;
+                return yAtMid + (slowSpeed * slowTime);
+            }
         }
     };
 })();
@@ -124,7 +135,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_0.92h_5.15s.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Buffer_5.1s.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
