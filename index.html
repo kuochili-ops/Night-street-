@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 固定速率鎖死版</title>
+    <title>NightST - 純淨線性鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -45,7 +45,6 @@
         <span class="label-text" style="margin-left:10px;">停止時間 (秒):</span>
         <input type="text" id="endTimeInput" value="5.1">
     </div>
-    <div style="font-size: 12px; color: #666;">* 速率 0.214 約等於原本 4.2 秒走 0.9h。速率不變時，停止時間越晚，位置越低。</div>
 
     <div class="btn-group">
         <button id="runBtn">預覽</button>
@@ -55,8 +54,10 @@
 
 <script>
 /**
- * [FlipBoardModule] 固定速率邏輯
- * getY 不再管終點在哪，只根據時間與速度計算當前位置。
+ * [FlipBoardModule] 純線性邏輯
+ * 1. 取消所有 Math.exp 或衰減計算。
+ * 2. 只有 startY + (speed * delta)。
+ * 3. 超過 endTime 即刻停止 Y 值更新。
  */
 const FlipBoardModule = (() => {
     return {
@@ -64,14 +65,14 @@ const FlipBoardModule = (() => {
             const startTime = 0.8; 
             const endTime = userEndTime; 
             const startY = h * -0.2; 
-            
-            // 🚩 速度改由用戶決定 (每秒移動畫布高度的幾倍)
             const speed = h * userSpeed;
 
             if (time < startTime) return startY;
             
-            // 🚩 鎖死邏輯：只計算到 endTime 為止的位移
+            // 🚩 核心鎖死：強制限制有效時間，不提供任何結束後的緩衝位移
             const effectiveTime = Math.min(time, endTime) - startTime;
+            
+            // 單純線性公式：y = 起點 + (速度 * 時間)
             return startY + (speed * effectiveTime);
         }
     };
@@ -99,8 +100,6 @@ function render() {
     const time = video.currentTime;
     const signText = signInput.value;
     const chosenColor = colorInput.value;
-    
-    // 獲取自定義參數
     const userSpeed = parseFloat(speedInput.value) || 0.214;
     const userEnd = parseFloat(endTimeInput.value) || 5.1;
 
@@ -142,7 +141,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `NightST_Spd${speedInput.value}_End${endTimeInput.value}.mp4`; a.click();
+    a.href = url; a.download = `NightST_Linear_End${endTimeInput.value}.mp4`; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
