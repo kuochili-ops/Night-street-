@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 定點鎖死優化版</title>
+    <title>NightST - 5.2s 絕對鎖死版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,7 +37,7 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製並分享 🎬</button>
+        <button id="shareBtn">高品質錄製 🎬</button>
     </div>
 </div>
 
@@ -47,9 +47,9 @@ const FlipBoardModule = (() => {
         getY: (h, time) => {
             const startTime = 0.8; 
             const stopTime = 2.4;  
-            const endTime = 5.1;   
+            const endTime = 5.2;   
             const startY = h * -0.2; 
-            const endY = h * 0.15; // 提高進場定點
+            const endY = h * 0.22; 
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -57,8 +57,7 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            // 大幅降速，防止文字上飄
-            const driftRate = h * 0.032; 
+            const driftRate = h * 0.11; 
             const effectiveDriftTime = Math.min(time, endTime) - stopTime;
             
             return endY + (driftRate * effectiveDriftTime); 
@@ -92,13 +91,8 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         
         let fontSize = h * 0.09;
-        const maxContentHeight = h * 0.35; 
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         
-        if (lines.length * fontSize * 1.2 > maxContentHeight) {
-            fontSize = maxContentHeight / (lines.length * 1.2);
-        }
-
         ctx.fillStyle = chosenColor; 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle"; 
@@ -128,17 +122,9 @@ function render() {
 async function exportAndShare() {
     if (recordedChunks.length === 0) return;
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
-    const file = new File([blob], "NightST_Locked.mp4", { type: "video/mp4" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: 'NightST 作品' }); } 
-        catch (err) { triggerDownload(blob); }
-    } else { triggerDownload(blob); }
-}
-
-function triggerDownload(blob) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Locked.mp4'; a.click();
+    a.href = url; a.download = 'NightST_5.2s_Final.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
