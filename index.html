@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 5.2s 絕對鎖死版</title>
+    <title>NightST - 絕對鎖死優化版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,11 +37,15 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
+/**
+ * [FlipBoardModule] 絕對鎖死邏輯
+ * 調整 driftRate 至 0.103，精準匹配背景上升速度，消除結尾位移。
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
@@ -49,7 +53,7 @@ const FlipBoardModule = (() => {
             const stopTime = 2.4;  
             const endTime = 5.2;   
             const startY = h * -0.2; 
-            const endY = h * 0.22; 
+            const endY = h * 0.22; // 2.4秒時的目標起點
 
             if (time < startTime) return startY;
             if (time <= stopTime) {
@@ -57,7 +61,8 @@ const FlipBoardModule = (() => {
                 return startY + (endY - startY) * progress;
             }
 
-            const driftRate = h * 0.11; 
+            // 🚩 精修補償率：0.103 是目前的黃金數值，確保 5.2秒前文字與板子同步
+            const driftRate = h * 0.103; 
             const effectiveDriftTime = Math.min(time, endTime) - stopTime;
             
             return endY + (driftRate * effectiveDriftTime); 
@@ -124,7 +129,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_5.2s_Final.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Locked_Final.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
