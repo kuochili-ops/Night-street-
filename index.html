@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對鎖死定稿版</title>
+    <title>NightST - 絕對鎖死修正版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,19 +43,19 @@
 
 <script>
 /**
- * [FlipBoardModule] 絕對鎖死定稿邏輯
- * 1. 調整位移速率 (0.80h) 以完美咬合畫面上移速度。
- * 2. 結束時間微調至 4.95s，實現絕對鎖定。
+ * [FlipBoardModule] 絕對鎖死修正邏輯
+ * 1. 調整位移速度至 0.85h。
+ * 2. 結束時間固定在 5.3 秒，與畫面同步靜止。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 4.95;   // 🚩 提早至 4.95s 結束
+            const endTime = 5.3;   // 🚩 修正回 5.3s 結束
             const startY = h * -0.2; 
             
-            // 🚩 再次微調速率：從 0.785h 提升至 0.80h
-            const totalTravel = h * 0.80; 
+            // 🚩 加快移動速率：調整至 0.85h
+            const totalTravel = h * 0.85; 
             const speed = totalTravel / (endTime - startTime);
 
             if (time < startTime) return startY;
@@ -125,7 +125,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Final_Absolute_Locked.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Locked_5.3s_V4.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
@@ -135,7 +135,7 @@ document.getElementById('shareBtn').onclick = () => {
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
     try {
-        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 10000000 }); // 提高碼率至 10M
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 10000000 });
         mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
         mediaRecorder.onstop = exportAndShare;
         mediaRecorder.start();
