@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絕對鎖死修正版</title>
+    <title>NightST - 絕對鎖死定稿版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -37,24 +37,24 @@
     </div>
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製高品質成品 🎬</button>
+        <button id="shareBtn">高品質錄製成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 絕對鎖死修正邏輯
- * 1. 調整位移速度至 0.85h。
- * 2. 結束時間固定在 5.3 秒，與畫面同步靜止。
+ * [FlipBoardModule] 絕對鎖死定稿邏輯
+ * 1. 調整位移速度至 0.85h (增強下壓感)。
+ * 2. 結束時間固定在 5.3 秒 (與背景同步靜止)。
  */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time) => {
             const startTime = 0.8; 
-            const endTime = 5.3;   // 🚩 修正回 5.3s 結束
+            const endTime = 5.3;   // 🚩 鎖定於 5.3s 結束
             const startY = h * -0.2; 
             
-            // 🚩 加快移動速率：調整至 0.85h
+            // 🚩 速率調整：0.85h 提供穩定的下移速率以抵銷看板上移
             const totalTravel = h * 0.85; 
             const speed = totalTravel / (endTime - startTime);
 
@@ -91,6 +91,7 @@ function render() {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time);
         
+        // 渲染設置：確保粗體字與發光效果
         let fontSize = h * 0.09;
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
         
@@ -111,6 +112,7 @@ function render() {
         ctx.restore();
     }
 
+    // 3秒後顯示右下角浮水印
     if (time >= 3.0) {
         const imgW = w * 0.25;
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
@@ -125,7 +127,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'NightST_Locked_5.3s_V4.mp4'; a.click();
+    a.href = url; a.download = 'NightST_Final_Absolute.mp4'; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
@@ -135,13 +137,14 @@ document.getElementById('shareBtn').onclick = () => {
     recordedChunks = [];
     const stream = canvas.captureStream(30); 
     try {
+        // 設定較高碼率（10Mbps）以保證畫質
         mediaRecorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 10000000 });
         mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
         mediaRecorder.onstop = exportAndShare;
         mediaRecorder.start();
         video.play();
         render();
-    } catch (e) { alert("錄製失敗"); }
+    } catch (e) { alert("錄製失敗，請檢查瀏覽器支持情況"); }
 };
 
 function setup() {
