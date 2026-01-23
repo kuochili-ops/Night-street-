@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 純淨平滑版</title>
+    <title>NightST - 終極穩定純淨版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -12,7 +12,8 @@
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; align-items: center; background: #1a1a1a; padding: 12px; border-radius: 8px; }
         .label-text { font-size: 13px; color: #aaa; white-space: nowrap; min-width: 80px; }
-        input[type="text"] { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 14px; flex-grow: 1; }
+        input[type="text"] { padding: 12px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 16px; flex-grow: 1; outline: none; }
+        input[type="text"]:focus { border-color: var(--accent); }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         button { flex: 1; padding: 15px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
         #runBtn { background: #444; color: #fff; }
@@ -28,52 +29,55 @@
 
 <div class="controls">
     <div class="input-row">
-        <span class="label-text">文字內容:</span>
-        <input type="text" id="signText" value="臺北今夜 NightST">
-        <input type="color" id="textColor" value="#FF0000" style="width:40px; height:40px; padding:0; border:none; background:none; cursor:pointer;">
+        <span class="label-text">內容:</span>
+        <input type="text" id="signText" value="Dear Serena 晚安">
+        <input type="color" id="textColor" value="#FF0000" style="width:50px; height:45px; border:none; background:none; cursor:pointer;">
     </div>
 
     <div class="btn-group">
-        <button id="runBtn">開始預覽</button>
-        <button id="shareBtn">錄製高品質成品 🎬</button>
+        <button id="runBtn">預覽效果</button>
+        <button id="shareBtn">生成高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 封裝邏輯
+ * [FlipBoardModule] 
+ * 優化重點：物理座標鎖定技術
  */
 const FlipBoardModule = (() => {
-    // 🚩 固定參數設定
-    const SETTINGS = {
+    const CONFIG = {
         speed: 0.189,
         endTime: 4.2,
-        yOffset: 0,
-        startTime: 0.8
+        startTime: 0.8,
+        yOffset: 0
     };
 
     return {
         getY: (h, time) => {
-            const startY = h * -0.2 + SETTINGS.yOffset; 
-            const speed = h * SETTINGS.speed;
+            const startY = h * -0.2 + CONFIG.yOffset; 
+            const speed = h * CONFIG.speed;
 
-            if (time < SETTINGS.startTime) return startY;
+            if (time < CONFIG.startTime) return startY;
             
-            if (time <= SETTINGS.endTime) {
-                return startY + (speed * (time - SETTINGS.startTime));
+            let targetY;
+            if (time <= CONFIG.endTime) {
+                targetY = startY + (speed * (time - CONFIG.startTime));
             } else {
-                const yAtEnd = startY + (speed * (SETTINGS.endTime - SETTINGS.startTime));
-                const deltaTime = time - SETTINGS.endTime;
-                const damping = 25; // 強力阻尼防止彈跳
-                return yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
+                // 🚩 鎖定邏輯：極高阻尼 + 指數衰減，確保 0.05s 內完全靜止
+                const yAtEnd = startY + (speed * (CONFIG.endTime - CONFIG.startTime));
+                const deltaTime = time - CONFIG.endTime;
+                const damping = 35; 
+                targetY = yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
+
+            // 🚩 終結跳動：在運動接近停止或停止後，強制取整像素座標
+            return time > CONFIG.endTime ? Math.round(targetY) : targetY;
         },
-        getCharWeight: (str) => {
-            let weight = 0;
-            for (let char of str) {
-                weight += char.charCodeAt(0) > 255 ? 1 : 0.5;
-            }
-            return weight;
+        getWeight: (str) => {
+            let w = 0;
+            for (let c of str) w += c.charCodeAt(0) > 255 ? 1 : 0.5;
+            return w;
         }
     };
 })();
@@ -97,43 +101,45 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 智慧分行邏輯
-        const maxLineWidthWeight = 11; 
+        // 🚩 智慧分行：調寬單行容量至 12 權重
+        const maxWeight = 12; 
         let lines = [];
-        let tempLine = "";
-        let tempWeight = 0;
+        let curLine = "", curW = 0;
 
         for (let char of fullText) {
-            let charWeight = char.charCodeAt(0) > 255 ? 1 : 0.5;
-            if (tempWeight + charWeight > maxLineWidthWeight) {
-                lines.push(tempLine);
-                tempLine = char;
-                tempWeight = charWeight;
+            let charW = char.charCodeAt(0) > 255 ? 1 : 0.5;
+            if (curW + charW > maxWeight) {
+                lines.push(curLine);
+                curLine = char; curW = charW;
             } else {
-                tempLine += char;
-                tempWeight += charWeight;
+                curLine += char; curW += charW;
             }
         }
-        if (tempLine) lines.push(tempLine);
+        if (curLine) lines.push(curLine);
 
-        // 智慧縮放算法
-        let baseSize = h * 0.16; 
-        let maxRowWeight = Math.max(...lines.map(l => FlipBoardModule.getCharWeight(l)));
-        let widthScale = Math.min(1, 6 / maxRowWeight);
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 1.8 / lines.length);
+        // 🚩 字少放大邏輯：基礎字體調大至 18% h
+        let baseSize = h * 0.18; 
+        let maxRowW = Math.max(...lines.map(l => FlipBoardModule.getWeight(l)));
+        
+        // 寬度自適應：如果最長行超過 5 個全形字才開始縮小
+        let widthScale = Math.min(1, 5.5 / maxRowW);
+        // 高度自適應：行數超過 1 行才開始縮小
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 1.9 / lines.length);
         
         let finalFontSize = baseSize * widthScale * heightScale;
-        finalFontSize = Math.max(h * 0.055, finalFontSize);
+        finalFontSize = Math.max(h * 0.06, finalFontSize); // 最小字體保險
 
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font = `900 ${finalFontSize}px sans-serif`;
-        ctx.shadowBlur = 15;
+        
+        // 增強發光感以掩蓋背景噪點
+        ctx.shadowBlur = 12;
         ctx.shadowColor = ctx.fillStyle;
 
-        const drawX = w * 0.55; // 依照需求調整位置
-        const lineHeight = finalFontSize * 1.15;
+        const drawX = w * 0.53; // 🚩 位置微調：向左移一點點
+        const lineHeight = finalFontSize * 1.12;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
             ctx.fillText(line, drawX, rowY);
@@ -154,13 +160,13 @@ document.getElementById('shareBtn').onclick = () => {
     setup();
     const chunks = [];
     const stream = canvas.captureStream(60); 
-    const recorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 15000000 });
+    const recorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 18000000 });
     recorder.ondataavailable = e => chunks.push(e.data);
     recorder.onstop = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_Clean.mp4`;
+        a.download = `NightST_UltraSmooth.mp4`;
         a.click();
     };
     recorder.start();
