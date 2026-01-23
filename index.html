@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 終極絲滑穩定版</title>
+    <title>NightST - 絲滑穩定終結版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -57,10 +57,6 @@
 </div>
 
 <script>
-/**
- * [FlipBoardModule] 智慧追蹤衰減
- * 優化衰減係數，讓 4.1s 的停止更貼合影片背景的運動軌跡。
- */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time, speedFactor, endTime, yOffset) => {
@@ -69,19 +65,13 @@ const FlipBoardModule = (() => {
             const speed = h * speedFactor;
 
             if (time < startTime) return startY;
-
             if (time <= endTime) {
                 return startY + (speed * (time - startTime));
             } else {
-                // 🚩 改進的指數衰減：模擬物理阻尼
                 const yAtEnd = startY + (speed * (endTime - startTime));
                 const deltaTime = time - endTime;
-                
-                // 阻尼系數調整為 12 (稍慢於之前的 20)，這會增加 0.05 秒的平滑感
-                const damping = 12;
-                const bufferDist = (speed / damping) * (1 - Math.exp(-damping * deltaTime));
-                
-                return yAtEnd + bufferDist;
+                const damping = 12; // 智慧衰減阻尼
+                return yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
         }
     };
@@ -106,9 +96,7 @@ function render() {
 
     if (time >= 0.8) {
         ctx.save();
-        // 渲染座標
         const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
-        
         const text = document.getElementById('signText').value;
         const fontSize = h * 0.09;
         ctx.fillStyle = document.getElementById('textColor').value;
@@ -131,7 +119,6 @@ function render() {
         const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
         ctx.drawImage(cornerImg, w - imgW - 20, h - imgH - 20, imgW, imgH);
     }
-    
     requestAnimationFrame(render);
 }
 
@@ -146,7 +133,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_Smooth.mp4`;
+        a.download = `NightST_Final_Stable.mp4`;
         a.click();
     };
     recorder.start();
