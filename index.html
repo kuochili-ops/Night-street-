@@ -1,67 +1,7 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <title>NightST - 無彈跳絕對鎖死</title>
-    <style>
-        :root { --accent: #00ff88; --bg: #050505; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .view-port { position: relative; width: 100%; max-width: 800px; aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; border-radius: 8px; }
-        canvas, video { position: absolute; width: 100%; height: 100%; }
-        #mainVideo { display: none; }
-        .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
-        .input-row { display: flex; gap: 10px; align-items: center; background: #1a1a1a; padding: 12px; border-radius: 8px; }
-        .label-text { font-size: 13px; color: #aaa; white-space: nowrap; min-width: 80px; }
-        input { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 14px; }
-        #signText { flex-grow: 1; }
-        .val-input { width: 70px; text-align: center; color: var(--accent); font-weight: bold; }
-        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        button { flex: 1; padding: 15px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
-        #runBtn { background: #444; color: #fff; }
-        #shareBtn { background: var(--accent); color: #000; }
-    </style>
-</head>
-<body>
-
-<div class="view-port">
-    <video id="mainVideo" src="NightST.MP4" playsinline muted></video>
-    <canvas id="compCanvas"></canvas>
-</div>
-
-<div class="controls">
-    <div class="input-row">
-        <span class="label-text">文字內容:</span>
-        <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
-        <input type="color" id="textColor" value="#FF0000" style="width:40px; padding:0;">
-    </div>
-    
-    <div class="input-row" style="justify-content: space-around;">
-        <div>
-            <span class="label-text">速率:</span>
-            <input type="text" id="speedInput" class="val-input" value="0.2">
-        </div>
-        <div>
-            <span class="label-text">停止時間:</span>
-            <input type="text" id="endTimeInput" class="val-input" value="4.1">
-        </div>
-        <div>
-            <span class="label-text">Y 軸微調:</span>
-            <input type="text" id="yOffsetInput" class="val-input" value="0">
-        </div>
-    </div>
-
-    <div class="btn-group">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
-    </div>
-</div>
-
 <script>
 /**
- * [FlipBoardModule] 絕對線性鎖定模組
- * 優化點：
- * 1. 移除複雜快照，改用單一時間截斷函數。
- * 2. 座標強制進行像素取整 (Math.round)，消除亞像素抖動引起的「彈跳感」。
+ * [FlipBoardModule] 慣性軟著陸版
+ * 解決 4.1s 硬停止產生的彈跳感。
  */
 const FlipBoardModule = (() => {
     return {
@@ -70,82 +10,35 @@ const FlipBoardModule = (() => {
             const startY = h * -0.2 + parseFloat(yOffset); 
             const speed = h * speedFactor;
 
-            // 🚩 時間截斷：只要時間超過 endTime，就永遠只代入 endTime 計算
-            const effectiveTime = Math.max(0, Math.min(time, endTime) - startTime);
-            
-            // 計算精確 Y 值
-            const rawY = startY + (speed * effectiveTime);
-            
-            // 🚩 物理取整：防止亞像素渲染造成的視覺顫抖
-            return Math.round(rawY);
+            if (time < startTime) return startY;
+
+            // 🚩 核心邏輯：在 endTime 之前正常線性移動
+            if (time <= endTime) {
+                return startY + (speed * (time - startTime));
+            } else {
+                // 🚩 軟著陸階段：使用指數衰減函數 (Damping)
+                // 讓文字在 endTime 後繼續滑行極小的一段距離，並在 0.2 秒內完全停死
+                const yAtEnd = startY + (speed * (endTime - startTime));
+                const deltaTime = time - endTime;
+                
+                // 衰減係數 15 代表極快停下，既保留了慣性又不會有下墜視覺
+                const dampingEffect = (speed / 15) * (1 - Math.exp(-15 * deltaTime));
+                
+                return yAtEnd + dampingEffect;
+            }
         }
     };
 })();
 
-const video = document.getElementById('mainVideo');
-const canvas = document.getElementById('compCanvas');
-const ctx = canvas.getContext('2d');
-
+// 修改 render 函數中的座標處理，從 Math.round 改為更平滑的數值
 function render() {
-    if (video.paused || video.ended) return;
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.drawImage(video, 0, 0, w, h);
-    
-    const time = video.currentTime;
-    const speed = parseFloat(document.getElementById('speedInput').value) || 0.2;
-    const end = parseFloat(document.getElementById('endTimeInput').value) || 4.1;
-    const offset = parseFloat(document.getElementById('yOffsetInput').value) || 0;
-
+    // ... 前段代碼不變 ...
     if (time >= 0.8) {
         ctx.save();
+        // 🚩 移除 Math.round，改用普通數值讓瀏覽器執行抗鋸齒渲染，減少閃爍
         const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
         
-        const text = document.getElementById('signText').value;
-        const fontSize = h * 0.09;
-        ctx.fillStyle = document.getElementById('textColor').value;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = `900 ${fontSize}px sans-serif`;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = ctx.fillStyle;
-
-        const lines = text.length > 7 ? [text.slice(0, 7), text.slice(7)] : [text];
-        const lineHeight = fontSize * 1.2;
-        lines.forEach((line, i) => {
-            ctx.fillText(line, w / 2, currentY + (i - (lines.length-1)/2) * lineHeight);
-        });
-        ctx.restore();
+        // ... 繪製邏輯 ...
     }
-    
-    requestAnimationFrame(render);
-}
-
-document.getElementById('runBtn').onclick = () => { setup(); video.play(); render(); };
-document.getElementById('shareBtn').onclick = () => {
-    setup();
-    const chunks = [];
-    const stream = canvas.captureStream(60); // 提高錄製幀率以增加平滑度
-    const recorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 15000000 });
-    recorder.ondataavailable = e => chunks.push(e.data);
-    recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/mp4" });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Spd${speedInput.value}_End${endTimeInput.value}.mp4`;
-        a.click();
-    };
-    recorder.start();
-    video.play();
-    render();
-    video.onended = () => recorder.stop();
-};
-
-function setup() {
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    video.currentTime = 0;
 }
 </script>
-</body>
-</html>
