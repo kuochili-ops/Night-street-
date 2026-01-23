@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 智慧排版穩定版</title>
+    <title>NightST - 純淨平滑版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -12,9 +12,7 @@
         .controls { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 800px; }
         .input-row { display: flex; gap: 10px; align-items: center; background: #1a1a1a; padding: 12px; border-radius: 8px; }
         .label-text { font-size: 13px; color: #aaa; white-space: nowrap; min-width: 80px; }
-        input { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 14px; }
-        #signText { flex-grow: 1; }
-        .val-input { width: 70px; text-align: center; color: var(--accent); font-weight: bold; }
+        input[type="text"] { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; font-size: 14px; flex-grow: 1; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         button { flex: 1; padding: 15px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; transition: 0.3s; }
         #runBtn { background: #444; color: #fff; }
@@ -32,48 +30,41 @@
     <div class="input-row">
         <span class="label-text">文字內容:</span>
         <input type="text" id="signText" value="臺北今夜 NightST">
-        <input type="color" id="textColor" value="#FF0000" style="width:40px; padding:0;">
-    </div>
-    
-    <div class="input-row" style="justify-content: space-around;">
-        <div>
-            <span class="label-text">速率:</span>
-            <input type="text" id="speedInput" class="val-input" value="0.198">
-        </div>
-        <div>
-            <span class="label-text">停止時間:</span>
-            <input type="text" id="endTimeInput" class="val-input" value="4.1">
-        </div>
-        <div>
-            <span class="label-text">Y 軸微調:</span>
-            <input type="text" id="yOffsetInput" class="val-input" value="0">
-        </div>
+        <input type="color" id="textColor" value="#FF0000" style="width:40px; height:40px; padding:0; border:none; background:none; cursor:pointer;">
     </div>
 
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
+        <button id="runBtn">開始預覽</button>
         <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule]
+ * [FlipBoardModule] 封裝邏輯
  */
 const FlipBoardModule = (() => {
-    return {
-        getY: (h, time, speedFactor, endTime, yOffset) => {
-            const startTime = 0.8;
-            const startY = h * -0.2 + parseFloat(yOffset); 
-            const speed = h * speedFactor;
+    // 🚩 固定參數設定
+    const SETTINGS = {
+        speed: 0.189,
+        endTime: 4.2,
+        yOffset: 0,
+        startTime: 0.8
+    };
 
-            if (time < startTime) return startY;
-            if (time <= endTime) {
-                return startY + (speed * (time - startTime));
+    return {
+        getY: (h, time) => {
+            const startY = h * -0.2 + SETTINGS.yOffset; 
+            const speed = h * SETTINGS.speed;
+
+            if (time < SETTINGS.startTime) return startY;
+            
+            if (time <= SETTINGS.endTime) {
+                return startY + (speed * (time - SETTINGS.startTime));
             } else {
-                const yAtEnd = startY + (speed * (endTime - startTime));
-                const deltaTime = time - endTime;
-                const damping = 25; 
+                const yAtEnd = startY + (speed * (SETTINGS.endTime - SETTINGS.startTime));
+                const deltaTime = time - SETTINGS.endTime;
+                const damping = 25; // 強力阻尼防止彈跳
                 return yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
         },
@@ -100,16 +91,13 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     
     const time = video.currentTime;
-    const speed = parseFloat(document.getElementById('speedInput').value) || 0.198;
-    const end = parseFloat(document.getElementById('endTimeInput').value) || 4.1;
-    const offset = parseFloat(document.getElementById('yOffsetInput').value) || 0;
 
     if (time >= 0.8) {
         ctx.save();
-        const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
+        const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 智慧分行邏輯：單行權重調整為 11
+        // 智慧分行邏輯
         const maxLineWidthWeight = 11; 
         let lines = [];
         let tempLine = "";
@@ -128,18 +116,14 @@ function render() {
         }
         if (tempLine) lines.push(tempLine);
 
-        // 🚩 改進的字體縮放：字少時更激進地變大
-        // 基礎字體大小設為畫布高度的 16%
+        // 智慧縮放算法
         let baseSize = h * 0.16; 
         let maxRowWeight = Math.max(...lines.map(l => FlipBoardModule.getCharWeight(l)));
-        
-        // 寬度比例限制：最長行超過 6 個字開始縮小
         let widthScale = Math.min(1, 6 / maxRowWeight);
-        // 行數比例限制：超過 1 行開始縮小
         let heightScale = lines.length === 1 ? 1 : Math.min(1, 1.8 / lines.length);
         
         let finalFontSize = baseSize * widthScale * heightScale;
-        finalFontSize = Math.max(h * 0.055, finalFontSize); // 設定最小字體限制
+        finalFontSize = Math.max(h * 0.055, finalFontSize);
 
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
@@ -148,8 +132,7 @@ function render() {
         ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        // 🚩 位置微調：從 0.58 調整為 0.55 (稍微靠左一點)
-        const drawX = w * 0.55; 
+        const drawX = w * 0.55; // 依照需求調整位置
         const lineHeight = finalFontSize * 1.15;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
@@ -177,7 +160,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_LeftAligned_BigText.mp4`;
+        a.download = `NightST_Final_Clean.mp4`;
         a.click();
     };
     recorder.start();
