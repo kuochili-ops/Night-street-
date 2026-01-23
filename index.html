@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 精準分行縮放版</title>
+    <title>NightST - 定點下移精準版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,20 +43,23 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心參數：速率 0.189 | 停止時間 4.2s
+ * 調整重心：yOffset 增加至 h * 0.08
  */
 const FlipBoardModule = (() => {
     const CONFIG = {
         speed: 0.189,
         endTime: 4.2,
         startTime: 0.8,
-        yOffset: 0
+        // 🚩 往下移動定點：增加 yOffset
+        yOffsetRatio: 0.08 
     };
 
     return {
         getY: (h, time) => {
-            const startY = h * -0.2 + CONFIG.yOffset; 
+            const yOffset = h * CONFIG.yOffsetRatio;
+            const startY = h * -0.2 + yOffset; 
             const speed = h * CONFIG.speed;
+            
             if (time < CONFIG.startTime) return startY;
             
             let targetY;
@@ -68,11 +71,12 @@ const FlipBoardModule = (() => {
                 const damping = 35; 
                 targetY = yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
+            // 物理鎖定
             return time > CONFIG.endTime ? Math.round(targetY) : targetY;
         },
         getWeight: (str) => {
             let w = 0;
-            for (let c of str) w += c.charCodeAt(0) > 255 ? 1 : 0.5; // 中文=1, 英文=0.5
+            for (let c of str) w += c.charCodeAt(0) > 255 ? 1 : 0.5; // 2英文字=1中文字
             return w;
         }
     };
@@ -97,9 +101,9 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 🚩 需求 1: 每行最多 7 個中文字權重
+        // 🚩 每行七字邏輯
         const maxWeightPerLine = 7; 
-        const maxBoardWidth = w * 0.62; // 看板寬度邊界
+        const maxBoardWidth = w * 0.62; 
         
         let lines = [];
         let curLine = "", curW = 0;
@@ -113,30 +117,21 @@ function render() {
         }
         if (curLine) lines.push(curLine);
 
-        // 🚩 需求 2: 文字大小視字數調整
-        // 先以最大可能高度設定基礎字體
-        let baseFontSize = h * 0.32; 
+        // 🚩 智慧縮放計算
+        let baseFontSize = h * 0.30; 
         ctx.font = `900 ${baseFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         
-        // 測量最長行的實際寬度
         let longestLineWidth = 0;
         lines.forEach(l => {
             let m = ctx.measureText(l).width;
             if (m > longestLineWidth) longestLineWidth = m;
         });
 
-        // 計算寬度縮放率 (確保不爆框)
-        let widthScale = 1;
-        if (longestLineWidth > maxBoardWidth) {
-            widthScale = maxBoardWidth / longestLineWidth;
-        }
-        
-        // 計算高度縮放率 (行數越多，縮越小以填滿看板)
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.6 / (lines.length + 0.2));
+        let widthScale = Math.min(1, maxBoardWidth / longestLineWidth);
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.4 / (lines.length + 0.3));
         
         let finalFontSize = baseFontSize * widthScale * heightScale;
         
-        // 套用最終字體
         ctx.font = `900 ${finalFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
@@ -144,8 +139,8 @@ function render() {
         ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        const drawX = w * 0.52; // 看板水平中心點
-        const lineHeight = finalFontSize * 1.05;
+        const drawX = w * 0.52; 
+        const lineHeight = finalFontSize * 1.1;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
             ctx.fillText(line, drawX, rowY);
@@ -175,7 +170,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_Layout.mp4`;
+        a.download = `NightST_Final_CenterDown.mp4`;
         a.click();
     };
     recorder.start();
