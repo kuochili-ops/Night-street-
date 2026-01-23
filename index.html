@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 超大字體穩定版</title>
+    <title>NightST - 終極大字穩定版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -30,7 +30,7 @@
 <div class="controls">
     <div class="input-row">
         <span class="label-text">內容:</span>
-        <input type="text" id="signText" value="Dear Serena 晚安">
+        <input type="text" id="signText" value="台北今夜冷清清">
         <input type="color" id="textColor" value="#FF0000" style="width:50px; height:45px; border:none; background:none; cursor:pointer;">
     </div>
 
@@ -42,7 +42,8 @@
 
 <script>
 /**
- * [FlipBoardModule] 物理座標鎖定技術
+ * [FlipBoardModule] 
+ * 鎖定參數：速率 0.189 / 停止時間 4.2s
  */
 const FlipBoardModule = (() => {
     const CONFIG = {
@@ -65,10 +66,10 @@ const FlipBoardModule = (() => {
             } else {
                 const yAtEnd = startY + (speed * (CONFIG.endTime - CONFIG.startTime));
                 const deltaTime = time - CONFIG.endTime;
-                const damping = 35; 
+                const damping = 35; // 強化阻尼
                 targetY = yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
-            // 強制取整像素座標以終結跳動
+            // 終結跳動：停止後鎖定像素座標
             return time > CONFIG.endTime ? Math.round(targetY) : targetY;
         },
         getWeight: (str) => {
@@ -98,8 +99,8 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 智慧分行
-        const maxWeight = 12; 
+        // 1. 縮減邊界：將單行權重上限提高到 15 (原 12)
+        const maxWeight = 15; 
         let lines = [];
         let curLine = "", curW = 0;
         for (let char of fullText) {
@@ -112,29 +113,26 @@ function render() {
         }
         if (curLine) lines.push(curLine);
 
-        // 🚩🚩🚩 字體放大核心邏輯調整 🚩🚩🚩
-        // 1. 基礎字體調大至 22% h (原 18%)
-        let baseSize = h * 0.22; 
+        // 2. 字體再大一點：基礎比例提升至 26% h (原 22%)
+        let baseSize = h * 0.26; 
         let maxRowW = Math.max(...lines.map(l => FlipBoardModule.getWeight(l)));
         
-        // 2. 放寬寬度限制：超過 6.5 個字才開始縮小 (原 5.5)
-        let widthScale = Math.min(1, 6.5 / maxRowW);
-        // 3. 放寬高度限制：多行時的縮放係數提高到 2.2 (原 1.9)
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.2 / lines.length);
+        // 3. 放寬門檻：超過 8 個字才開始縮小 (原 6.5)
+        let widthScale = Math.min(1, 8.0 / maxRowW);
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.4 / lines.length);
         
         let finalFontSize = baseSize * widthScale * heightScale;
-        // 4. 提高最小字體保險至 7% (原 6%)
-        finalFontSize = Math.max(h * 0.07, finalFontSize);
+        finalFontSize = Math.max(h * 0.08, finalFontSize); // 提高保底字體大小
 
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font = `900 ${finalFontSize}px sans-serif`;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        const drawX = w * 0.53; // 維持靠左一點點的位置
-        const lineHeight = finalFontSize * 1.12;
+        const drawX = w * 0.53; 
+        const lineHeight = finalFontSize * 1.1;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
             ctx.fillText(line, drawX, rowY);
@@ -155,13 +153,13 @@ document.getElementById('shareBtn').onclick = () => {
     setup();
     const chunks = [];
     const stream = canvas.captureStream(60); 
-    const recorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 20000000 }); // 提高比特率以應對大字體細節
+    const recorder = new MediaRecorder(stream, { mimeType: "video/mp4", videoBitsPerSecond: 25000000 });
     recorder.ondataavailable = e => chunks.push(e.data);
     recorder.onstop = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_BigFont.mp4`;
+        a.download = `NightST_Final_UltraBig.mp4`;
         a.click();
     };
     recorder.start();
