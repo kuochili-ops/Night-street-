@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 邊界安全大字版</title>
+    <title>NightST - 精準分行縮放版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,7 +43,7 @@
 <script>
 /**
  * [FlipBoardModule]
- * 核心：0.189 速率 | 4.2s 鎖定
+ * 核心參數：速率 0.189 | 停止時間 4.2s
  */
 const FlipBoardModule = (() => {
     const CONFIG = {
@@ -72,7 +72,7 @@ const FlipBoardModule = (() => {
         },
         getWeight: (str) => {
             let w = 0;
-            for (let c of str) w += c.charCodeAt(0) > 255 ? 1 : 0.5;
+            for (let c of str) w += c.charCodeAt(0) > 255 ? 1 : 0.5; // 中文=1, 英文=0.5
             return w;
         }
     };
@@ -97,9 +97,9 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 1. 設定文字邊界（相對於看板）
-        const maxWeightPerLine = 14; 
-        const maxBoardWidth = w * 0.62; // 🚩 禁止超過畫布 62% 寬度（看板物理極限）
+        // 🚩 需求 1: 每行最多 7 個中文字權重
+        const maxWeightPerLine = 7; 
+        const maxBoardWidth = w * 0.62; // 看板寬度邊界
         
         let lines = [];
         let curLine = "", curW = 0;
@@ -113,29 +113,30 @@ function render() {
         }
         if (curLine) lines.push(curLine);
 
-        // 2. 初始字體大小設定
-        let baseFontSize = h * 0.30; 
+        // 🚩 需求 2: 文字大小視字數調整
+        // 先以最大可能高度設定基礎字體
+        let baseFontSize = h * 0.32; 
         ctx.font = `900 ${baseFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         
-        // 🚩 3. 邊界檢查：如果最長的一行超過看板寬度，強制等比例縮小
+        // 測量最長行的實際寬度
         let longestLineWidth = 0;
         lines.forEach(l => {
             let m = ctx.measureText(l).width;
             if (m > longestLineWidth) longestLineWidth = m;
         });
 
-        let safetyScale = 1;
+        // 計算寬度縮放率 (確保不爆框)
+        let widthScale = 1;
         if (longestLineWidth > maxBoardWidth) {
-            safetyScale = maxBoardWidth / longestLineWidth;
+            widthScale = maxBoardWidth / longestLineWidth;
         }
         
-        // 考慮多行高度縮放
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.5 / lines.length);
-        let finalFontSize = baseFontSize * safetyScale * heightScale;
+        // 計算高度縮放率 (行數越多，縮越小以填滿看板)
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.6 / (lines.length + 0.2));
         
-        // 最小保底尺寸
-        finalFontSize = Math.max(h * 0.08, finalFontSize);
-
+        let finalFontSize = baseFontSize * widthScale * heightScale;
+        
+        // 套用最終字體
         ctx.font = `900 ${finalFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
@@ -143,8 +144,7 @@ function render() {
         ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        // 4. 水平中心修正：0.52 最符合綠版中心
-        const drawX = w * 0.52; 
+        const drawX = w * 0.52; // 看板水平中心點
         const lineHeight = finalFontSize * 1.05;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
@@ -175,7 +175,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Safe_Boundary.mp4`;
+        a.download = `NightST_Final_Layout.mp4`;
         a.click();
     };
     recorder.start();
