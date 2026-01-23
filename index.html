@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 終極滿版大字版</title>
+    <title>NightST - 最終極限滿版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -35,15 +35,15 @@
     </div>
 
     <div class="btn-group">
-        <button id="runBtn">開始預覽</button>
-        <button id="shareBtn">生成高品質成品 🎬</button>
+        <button id="runBtn">預覽</button>
+        <button id="shareBtn">高品質錄製成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 核心：0.189 速率 | 4.2s 鎖定
+ * 鎖定參數：速率 0.189 | 停止時間 4.2s
  */
 const FlipBoardModule = (() => {
     const CONFIG = {
@@ -68,7 +68,7 @@ const FlipBoardModule = (() => {
                 const damping = 35; 
                 targetY = yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
-            // 物理吸附：定格後強制整數位移
+            // 物理硬鎖定：防止亞像素跳動
             return time > CONFIG.endTime ? Math.round(targetY) : targetY;
         },
         getWeight: (str) => {
@@ -98,8 +98,8 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 1. 左右邊界極小化：單行最大容量放寬至 17
-        const maxWeight = 17; 
+        // 1. 邊界再縮一點：單行容量極限放寬至 20
+        const maxWeight = 20; 
         let lines = [];
         let curLine = "", curW = 0;
         for (let char of fullText) {
@@ -112,29 +112,29 @@ function render() {
         }
         if (curLine) lines.push(curLine);
 
-        // 2. 字體極大化計算：基礎比例 29% (壓榨看板高度)
-        let baseSize = h * 0.29; 
+        // 2. 字體垂直極限：基礎比例 31% h
+        let baseSize = h * 0.31; 
         let maxRowW = Math.max(...lines.map(l => FlipBoardModule.getWeight(l)));
         
-        // 3. 放寬門檻：9 個全型字內不縮小
-        let widthScale = Math.min(1, 9.0 / maxRowW);
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.6 / lines.length);
+        // 3. 寬度門檻：10 個全型字內保持最大化
+        let widthScale = Math.min(1, 10.0 / maxRowW);
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.8 / lines.length);
         
         let finalFontSize = baseSize * widthScale * heightScale;
-        finalFontSize = Math.max(h * 0.09, finalFontSize); // 加大保底字體
+        finalFontSize = Math.max(h * 0.1, finalFontSize); // 加大保底字體
 
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        // 優先使用粗體，增強字體厚度感
         ctx.font = `900 ${finalFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         
-        // 增強發光特效
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 20;
         ctx.shadowColor = ctx.fillStyle;
 
-        // 4. 水平定位微調：0.52 讓左右留白更均勻
-        const drawX = w * 0.52; 
-        const lineHeight = finalFontSize * 1.08;
+        // 4. 水平定位再往左微調：0.51
+        const drawX = w * 0.51; 
+        const lineHeight = finalFontSize * 1.05;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
             ctx.fillText(line, drawX, rowY);
@@ -157,14 +157,14 @@ document.getElementById('shareBtn').onclick = () => {
     const stream = canvas.captureStream(60); 
     const recorder = new MediaRecorder(stream, { 
         mimeType: "video/mp4", 
-        videoBitsPerSecond: 30000000 // 極高比特率確保大字體邊緣不模糊
+        videoBitsPerSecond: 30000000 
     });
     recorder.ondataavailable = e => chunks.push(e.data);
     recorder.onstop = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_UltraFull.mp4`;
+        a.download = `NightST_Final_ExtremeFull.mp4`;
         a.click();
     };
     recorder.start();
