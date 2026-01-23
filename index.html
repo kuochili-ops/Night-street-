@@ -52,15 +52,14 @@
 
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製最終成品 🎬</button>
+        <button id="shareBtn">高品質錄製成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 引入指數衰減緩衝（Exponential Damping）
- * 解決 4.1s 瞬間硬停止造成的視覺彈跳感。
+ * [FlipBoardModule] 指數衰減緩衝
+ * 解決 4.1s 硬停止造成的視覺彈跳錯覺。
  */
 const FlipBoardModule = (() => {
     return {
@@ -71,16 +70,16 @@ const FlipBoardModule = (() => {
 
             if (time < startTime) return startY;
 
-            // 線性滑動階段
+            // 正常線性下滑階段
             if (time <= endTime) {
                 return startY + (speed * (time - startTime));
             } else {
-                // 🚩 緩衝階段：在 4.1s 之後，速度會在 0.1s 內迅速衰減至 0
+                // 🚩 緩衝階段：在 4.1s 之後進入極速衰減
                 const yAtEnd = startY + (speed * (endTime - startTime));
                 const deltaTime = time - endTime;
                 
-                // 衰減系數 20 意味著極其快速的停頓，消除「撞牆感」
-                const dampingFactor = 20;
+                // 阻尼系數 15 可確保 0.1s 內完成軟著陸
+                const dampingFactor = 15;
                 const bufferDist = (speed / dampingFactor) * (1 - Math.exp(-dampingFactor * deltaTime));
                 
                 return yAtEnd + bufferDist;
@@ -92,6 +91,8 @@ const FlipBoardModule = (() => {
 const video = document.getElementById('mainVideo');
 const canvas = document.getElementById('compCanvas');
 const ctx = canvas.getContext('2d');
+const cornerImg = new Image();
+cornerImg.src = 'IMG_6604.png'; 
 
 function render() {
     if (video.paused || video.ended) return;
@@ -106,7 +107,7 @@ function render() {
 
     if (time >= 0.8) {
         ctx.save();
-        // 🚩 移除 Math.round，讓 Canvas 的抗鋸齒處理微小的位置變動，視覺上更平滑
+        // 🚩 交由 Canvas 渲染引擎處理浮點座標，視覺上會比取整後更滑順
         const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
         
         const text = document.getElementById('signText').value;
@@ -125,6 +126,12 @@ function render() {
         });
         ctx.restore();
     }
+
+    if (time >= 3.0) {
+        const imgW = w * 0.25;
+        const imgH = imgW * (cornerImg.height / cornerImg.width || 1); 
+        ctx.drawImage(cornerImg, w - imgW - 20, h - imgH - 20, imgW, imgH);
+    }
     
     requestAnimationFrame(render);
 }
@@ -140,7 +147,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Smooth_Lock_4.1s.mp4`;
+        a.download = `NightST_Final_Smooth_4.1s.mp4`;
         a.click();
     };
     recorder.start();
