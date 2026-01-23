@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 純淨線性鎖死版</title>
+    <title>NightST - 絕對鎖死定格版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -43,37 +43,46 @@
         <span class="label-text">移動速率 (h/s):</span>
         <input type="text" id="speedInput" value="0.214">
         <span class="label-text" style="margin-left:10px;">停止時間 (秒):</span>
-        <input type="text" id="endTimeInput" value="5.1">
+        <input type="text" id="endTimeInput" value="5.0">
     </div>
 
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">錄製高品質成品 🎬</button>
+        <button id="shareBtn">高品質錄製成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 純線性邏輯
- * 1. 取消所有 Math.exp 或衰減計算。
- * 2. 只有 startY + (speed * delta)。
- * 3. 超過 endTime 即刻停止 Y 值更新。
+ * [FlipBoardModule] 
+ * 強化鎖定：一旦時間過期，直接回傳快照 Y 值，絕不進行二次運算。
  */
 const FlipBoardModule = (() => {
+    let lockedY = null;
+
     return {
         getY: (h, time, userSpeed, userEndTime) => {
-            const startTime = 0.8; 
-            const endTime = userEndTime; 
-            const startY = h * -0.2; 
+            const startTime = 0.8;
+            const startY = h * -0.2;
             const speed = h * userSpeed;
 
-            if (time < startTime) return startY;
-            
-            // 🚩 核心鎖死：強制限制有效時間，不提供任何結束後的緩衝位移
-            const effectiveTime = Math.min(time, endTime) - startTime;
-            
-            // 單純線性公式：y = 起點 + (速度 * 時間)
-            return startY + (speed * effectiveTime);
+            if (time < startTime) {
+                lockedY = null;
+                return startY;
+            }
+
+            // 🚩 鎖死判定：如果當前時間超過設定時間
+            if (time >= userEndTime) {
+                // 如果尚未記錄鎖定值，則計算最後一次並存起來
+                if (lockedY === null) {
+                    lockedY = startY + (speed * (userEndTime - startTime));
+                }
+                return lockedY; // 永遠回傳同一個數值，物理性凍結
+            }
+
+            // 正常移動期間
+            lockedY = null; 
+            return startY + (speed * (time - startTime));
         }
     };
 })();
@@ -101,11 +110,12 @@ function render() {
     const signText = signInput.value;
     const chosenColor = colorInput.value;
     const userSpeed = parseFloat(speedInput.value) || 0.214;
-    const userEnd = parseFloat(endTimeInput.value) || 5.1;
+    const userEnd = parseFloat(endTimeInput.value) || 5.0;
 
     if (signText && time >= 0.8) {
         ctx.save();
-        const currentY = FlipBoardModule.getY(h, time, userSpeed, userEnd);
+        // 🚩 座標取整，消除亞像素渲染導致的飄移感
+        const currentY = Math.floor(FlipBoardModule.getY(h, time, userSpeed, userEnd));
         
         let fontSize = h * 0.09;
         const lines = signText.length > 7 ? [signText.slice(0, 7), signText.slice(7)] : [signText];
@@ -141,7 +151,7 @@ async function exportAndShare() {
     const blob = new Blob(recordedChunks, { type: "video/mp4" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `NightST_Linear_End${endTimeInput.value}.mp4`; a.click();
+    a.href = url; a.download = `NightST_Final_Lock.mp4`; a.click();
 }
 
 video.onended = () => { if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop(); };
