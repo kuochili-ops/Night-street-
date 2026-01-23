@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 絲滑穩定終結版</title>
+    <title>NightST - 智慧排版絲滑版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -31,14 +31,14 @@
 <div class="controls">
     <div class="input-row">
         <span class="label-text">文字內容:</span>
-        <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景">
+        <input type="text" id="signText" value="臺北今夜冷清清也有一片的好夜景 NightST">
         <input type="color" id="textColor" value="#FF0000" style="width:40px; padding:0;">
     </div>
     
     <div class="input-row" style="justify-content: space-around;">
         <div>
             <span class="label-text">速率:</span>
-            <input type="text" id="speedInput" class="val-input" value="0.2">
+            <input type="text" id="speedInput" class="val-input" value="0.198">
         </div>
         <div>
             <span class="label-text">停止時間:</span>
@@ -57,6 +57,9 @@
 </div>
 
 <script>
+/**
+ * [FlipBoardModule] 指數衰減緩衝 + 智慧排版
+ */
 const FlipBoardModule = (() => {
     return {
         getY: (h, time, speedFactor, endTime, yOffset) => {
@@ -70,9 +73,17 @@ const FlipBoardModule = (() => {
             } else {
                 const yAtEnd = startY + (speed * (endTime - startTime));
                 const deltaTime = time - endTime;
-                const damping = 12; // 智慧衰減阻尼
+                const damping = 12; 
                 return yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
+        },
+        // 計算智慧字數長度 (兩個英文字母 = 一個中文字)
+        getSmartLength: (str) => {
+            let len = 0;
+            for (let i = 0; i < str.length; i++) {
+                len += str.charCodeAt(i) > 255 ? 1 : 0.5;
+            }
+            return len;
         }
     };
 })();
@@ -90,15 +101,40 @@ function render() {
     ctx.drawImage(video, 0, 0, w, h);
     
     const time = video.currentTime;
-    const speed = parseFloat(document.getElementById('speedInput').value) || 0.2;
+    const speed = parseFloat(document.getElementById('speedInput').value) || 0.198;
     const end = parseFloat(document.getElementById('endTimeInput').value) || 4.1;
     const offset = parseFloat(document.getElementById('yOffsetInput').value) || 0;
 
     if (time >= 0.8) {
         ctx.save();
         const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
-        const text = document.getElementById('signText').value;
-        const fontSize = h * 0.09;
+        const fullText = document.getElementById('signText').value;
+        
+        // 智慧分行邏輯：根據看板寬度調整
+        // 這裡設定單行最大字數權重約為 10
+        const maxWeight = 10;
+        let lines = [];
+        let currentLine = "";
+        let currentWeight = 0;
+
+        for (let char of fullText) {
+            let weight = char.charCodeAt(0) > 255 ? 1 : 0.5;
+            if (currentWeight + weight > maxWeight) {
+                lines.push(currentLine);
+                currentLine = char;
+                currentWeight = weight;
+            } else {
+                currentLine += char;
+                currentWeight += weight;
+            }
+        }
+        lines.push(currentLine);
+
+        // 根據行數動態縮放字體
+        let fontSize = h * 0.09;
+        if (lines.length > 2) fontSize = h * 0.07;
+        if (lines.length > 3) fontSize = h * 0.05;
+
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -106,10 +142,11 @@ function render() {
         ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        const lines = text.length > 7 ? [text.slice(0, 7), text.slice(7)] : [text];
+        // 文字向右微調：中心點設在 58% 處
+        const drawX = w * 0.58; 
         const lineHeight = fontSize * 1.2;
         lines.forEach((line, i) => {
-            ctx.fillText(line, w / 2, currentY + (i - (lines.length-1)/2) * lineHeight);
+            ctx.fillText(line, drawX, currentY + (i - (lines.length-1)/2) * lineHeight);
         });
         ctx.restore();
     }
@@ -133,7 +170,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_Stable.mp4`;
+        a.download = `NightST_Final_SmartLayout.mp4`;
         a.click();
     };
     recorder.start();
