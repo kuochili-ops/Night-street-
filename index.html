@@ -52,15 +52,13 @@
 
     <div class="btn-group">
         <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="shareBtn">錄製高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
- * [FlipBoardModule] 
- * 1. 修正彈跳：改用臨界衰減，確保運動曲線不回彈。
- * 2. 智慧計算：精確計算中英文混合長度。
+ * [FlipBoardModule]
  */
 const FlipBoardModule = (() => {
     return {
@@ -73,10 +71,9 @@ const FlipBoardModule = (() => {
             if (time <= endTime) {
                 return startY + (speed * (time - startTime));
             } else {
-                // 🚩 鎖死邏輯：移除任何可能導致回彈的係數，改用純物理停頓
                 const yAtEnd = startY + (speed * (endTime - startTime));
                 const deltaTime = time - endTime;
-                const damping = 25; // 提高阻尼，縮短滑行，徹底消除二次彈跳
+                const damping = 25; 
                 return yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
         },
@@ -112,8 +109,8 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time, speed, end, offset);
         const fullText = document.getElementById('signText').value;
         
-        // 🚩 智慧分行與字體縮放邏輯
-        const maxLineWidthWeight = 12; // 一行最多約 12 個中文字的寬度
+        // 智慧分行邏輯：單行權重調整為 11
+        const maxLineWidthWeight = 11; 
         let lines = [];
         let tempLine = "";
         let tempWeight = 0;
@@ -131,21 +128,18 @@ function render() {
         }
         if (tempLine) lines.push(tempLine);
 
-        // 🚩 動態字體大小：字越少、行越少，字體就越大
-        // 基本字體設定為畫布高度的 15% (針對少字狀況撐大)
-        let baseSize = h * 0.15; 
-        
-        // 找出所有行中最長的一行權重
+        // 🚩 改進的字體縮放：字少時更激進地變大
+        // 基礎字體大小設為畫布高度的 16%
+        let baseSize = h * 0.16; 
         let maxRowWeight = Math.max(...lines.map(l => FlipBoardModule.getCharWeight(l)));
         
-        // 根據寬度進行縮放限制：如果最長的一行超過 7 個字，開始縮小
-        let widthScale = Math.min(1, 7 / maxRowWeight);
-        // 根據行數進行縮放限制：行數越多，縮得越小
-        let heightScale = Math.min(1, 1.5 / lines.length);
+        // 寬度比例限制：最長行超過 6 個字開始縮小
+        let widthScale = Math.min(1, 6 / maxRowWeight);
+        // 行數比例限制：超過 1 行開始縮小
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 1.8 / lines.length);
         
         let finalFontSize = baseSize * widthScale * heightScale;
-        // 設定最小限制，避免字太小
-        finalFontSize = Math.max(h * 0.05, finalFontSize);
+        finalFontSize = Math.max(h * 0.055, finalFontSize); // 設定最小字體限制
 
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
@@ -154,8 +148,9 @@ function render() {
         ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        const drawX = w * 0.58; // 靠右對齊
-        const lineHeight = finalFontSize * 1.1;
+        // 🚩 位置微調：從 0.58 調整為 0.55 (稍微靠左一點)
+        const drawX = w * 0.55; 
+        const lineHeight = finalFontSize * 1.15;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
             ctx.fillText(line, drawX, rowY);
@@ -182,7 +177,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Optimized.mp4`;
+        a.download = `NightST_LeftAligned_BigText.mp4`;
         a.click();
     };
     recorder.start();
