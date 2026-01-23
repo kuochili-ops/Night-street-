@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>NightST - 最終極限滿版</title>
+    <title>NightST - 邊界安全大字版</title>
     <style>
         :root { --accent: #00ff88; --bg: #050505; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
@@ -35,15 +35,15 @@
     </div>
 
     <div class="btn-group">
-        <button id="runBtn">預覽</button>
-        <button id="shareBtn">高品質錄製成品 🎬</button>
+        <button id="runBtn">開始預覽</button>
+        <button id="shareBtn">生成高品質成品 🎬</button>
     </div>
 </div>
 
 <script>
 /**
  * [FlipBoardModule]
- * 鎖定參數：速率 0.189 | 停止時間 4.2s
+ * 核心：0.189 速率 | 4.2s 鎖定
  */
 const FlipBoardModule = (() => {
     const CONFIG = {
@@ -68,7 +68,6 @@ const FlipBoardModule = (() => {
                 const damping = 35; 
                 targetY = yAtEnd + (speed / damping) * (1 - Math.exp(-damping * deltaTime));
             }
-            // 物理硬鎖定：防止亞像素跳動
             return time > CONFIG.endTime ? Math.round(targetY) : targetY;
         },
         getWeight: (str) => {
@@ -98,13 +97,15 @@ function render() {
         const currentY = FlipBoardModule.getY(h, time);
         const fullText = document.getElementById('signText').value;
         
-        // 1. 邊界再縮一點：單行容量極限放寬至 20
-        const maxWeight = 20; 
+        // 1. 設定文字邊界（相對於看板）
+        const maxWeightPerLine = 14; 
+        const maxBoardWidth = w * 0.62; // 🚩 禁止超過畫布 62% 寬度（看板物理極限）
+        
         let lines = [];
         let curLine = "", curW = 0;
         for (let char of fullText) {
             let charW = char.charCodeAt(0) > 255 ? 1 : 0.5;
-            if (curW + charW > maxWeight) {
+            if (curW + charW > maxWeightPerLine) {
                 lines.push(curLine); curLine = char; curW = charW;
             } else {
                 curLine += char; curW += charW;
@@ -112,28 +113,38 @@ function render() {
         }
         if (curLine) lines.push(curLine);
 
-        // 2. 字體垂直極限：基礎比例 31% h
-        let baseSize = h * 0.31; 
-        let maxRowW = Math.max(...lines.map(l => FlipBoardModule.getWeight(l)));
+        // 2. 初始字體大小設定
+        let baseFontSize = h * 0.30; 
+        ctx.font = `900 ${baseFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         
-        // 3. 寬度門檻：10 個全型字內保持最大化
-        let widthScale = Math.min(1, 10.0 / maxRowW);
-        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.8 / lines.length);
-        
-        let finalFontSize = baseSize * widthScale * heightScale;
-        finalFontSize = Math.max(h * 0.1, finalFontSize); // 加大保底字體
+        // 🚩 3. 邊界檢查：如果最長的一行超過看板寬度，強制等比例縮小
+        let longestLineWidth = 0;
+        lines.forEach(l => {
+            let m = ctx.measureText(l).width;
+            if (m > longestLineWidth) longestLineWidth = m;
+        });
 
+        let safetyScale = 1;
+        if (longestLineWidth > maxBoardWidth) {
+            safetyScale = maxBoardWidth / longestLineWidth;
+        }
+        
+        // 考慮多行高度縮放
+        let heightScale = lines.length === 1 ? 1 : Math.min(1, 2.5 / lines.length);
+        let finalFontSize = baseFontSize * safetyScale * heightScale;
+        
+        // 最小保底尺寸
+        finalFontSize = Math.max(h * 0.08, finalFontSize);
+
+        ctx.font = `900 ${finalFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.fillStyle = document.getElementById('textColor').value;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        // 優先使用粗體，增強字體厚度感
-        ctx.font = `900 ${finalFontSize}px "PingFang TC", "Microsoft JhengHei", sans-serif`;
-        
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = ctx.fillStyle;
 
-        // 4. 水平定位再往左微調：0.51
-        const drawX = w * 0.51; 
+        // 4. 水平中心修正：0.52 最符合綠版中心
+        const drawX = w * 0.52; 
         const lineHeight = finalFontSize * 1.05;
         lines.forEach((line, i) => {
             const rowY = currentY + (i - (lines.length - 1) / 2) * lineHeight;
@@ -164,7 +175,7 @@ document.getElementById('shareBtn').onclick = () => {
         const blob = new Blob(chunks, { type: "video/mp4" });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `NightST_Final_ExtremeFull.mp4`;
+        a.download = `NightST_Safe_Boundary.mp4`;
         a.click();
     };
     recorder.start();
